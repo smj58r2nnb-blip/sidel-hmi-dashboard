@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidel Recipe Dashboard</title>
+    <title>Sidel HMI Recipe Dashboard</title>
     <style>
         :root {
             --bg-dark: #121212;
@@ -41,23 +41,38 @@
 
         .input-area {
             background-color: var(--bg-panel);
-            padding: 15px;
+            padding: 15px 20px;
             border-bottom: 1px solid var(--border-color);
             display: flex;
             gap: 15px;
-            align-items: flex-start;
+            align-items: center;
         }
 
-        textarea {
-            flex: 1;
-            height: 60px;
+        input[type="file"] {
             background-color: var(--bg-dark);
             color: var(--text-main);
+            padding: 10px;
             border: 1px solid var(--border-color);
             border-radius: 4px;
-            padding: 10px;
             font-family: monospace;
-            resize: vertical;
+            flex: 1;
+            max-width: 400px;
+        }
+
+        /* Style the default file chooser button slightly */
+        input[type="file"]::file-selector-button {
+            background-color: var(--border-color);
+            color: var(--text-main);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            margin-right: 15px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background-color: #444;
         }
 
         button {
@@ -69,7 +84,6 @@
             font-size: 1rem;
             cursor: pointer;
             transition: background-color 0.2s;
-            height: 100%;
         }
 
         button:hover {
@@ -190,8 +204,8 @@
     </header>
 
     <div class="input-area">
-        <textarea id="rawData" placeholder="Paste your raw Sidel recipe text export here..."></textarea>
-        <button onclick="parseRecipe()">Load Recipe</button>
+        <input type="file" id="fileInput" accept=".dbf,.txt,*/*" />
+        <button onclick="loadFile()">Upload & Load Recipe</button>
     </div>
 
     <div class="dashboard">
@@ -199,7 +213,7 @@
             <!-- Navigation items injected here -->
         </div>
         <div class="main-content" id="mainContent">
-            <div class="empty-state">Paste a recipe and click "Load Recipe" to view variables.</div>
+            <div class="empty-state">Select a Sidel recipe file and click "Upload & Load Recipe" to view variables.</div>
             <div id="tableContainer" style="display: none;">
                 <h2 id="sectionTitle">Section</h2>
                 <table id="dataTable">
@@ -221,8 +235,31 @@
     <script>
         let recipeData = {};
 
-        function parseRecipe() {
-            const rawText = document.getElementById('rawData').value;
+        function loadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert("Please select a file to upload first.");
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const rawText = e.target.result;
+                parseRecipe(rawText);
+            };
+
+            reader.onerror = function() {
+                alert("Error reading file. Please try again.");
+            };
+
+            // Read the file as a text string
+            reader.readAsText(file);
+        }
+
+        function parseRecipe(rawText) {
             const lines = rawText.split('\n');
             
             recipeData = {};
@@ -308,7 +345,7 @@
 
             if (Object.keys(recipeData).length === 0) {
                 document.querySelector('.empty-state').style.display = 'block';
-                document.querySelector('.empty-state').innerText = "No readable data found. Please check the pasted text.";
+                document.querySelector('.empty-state').innerText = "No readable data found in this file.";
                 document.getElementById('tableContainer').style.display = 'none';
             } else {
                 document.querySelector('.empty-state').style.display = 'none';
