@@ -173,15 +173,15 @@
         .lamp-panel { flex: 1; padding-bottom: 15px;}
         .grid-container {
             display: grid;
-            /* Updated to 16 columns for Ovens 1-16 */
-            grid-template-columns: 30px repeat(16, 1fr);
+            /* Added an extra 45px column at the end for the percentage text */
+            grid-template-columns: 30px repeat(16, 1fr) 45px;
             gap: 4px;
             padding: 15px;
             align-items: center;
         }
         .oven-numbers {
             display: grid;
-            grid-template-columns: 30px repeat(16, 1fr);
+            grid-template-columns: 30px repeat(16, 1fr) 45px;
             gap: 4px;
             padding: 5px 15px 0 15px;
             font-size: 0.7rem;
@@ -194,6 +194,13 @@
             font-size: 0.8rem;
             text-align: right;
             padding-right: 10px;
+        }
+        .grid-row-pct {
+            font-weight: bold;
+            font-size: 0.75rem;
+            text-align: right;
+            color: #555;
+            padding-left: 5px;
         }
         .lamp {
             height: 10px;
@@ -322,10 +329,9 @@
             const fields = [];
             let offset = 32;
             
-            // Extract DBF Field Descriptors
             while (offset < headerLength - 1) {
                 const firstByte = view.getUint8(offset);
-                if (firstByte === 0x0D) break; // End of header
+                if (firstByte === 0x0D) break; 
                 
                 let name = "";
                 for (let i = 0; i < 11; i++) {
@@ -336,7 +342,6 @@
                 offset += 32;
             }
             
-            // Read Binary Records
             const records = [];
             offset = headerLength;
             const decoder = new TextDecoder('windows-1252'); 
@@ -348,7 +353,6 @@
                 for (let j = 0; j < fields.length; j++) {
                     const field = fields[j];
                     const fieldData = new Uint8Array(arrayBuffer, recordOffset, field.length);
-                    // CRITICAL FIX: Replace invisible null bytes (\0) before trimming
                     record[field.name] = decoder.decode(fieldData).replace(/\0/g, '').trim();
                     recordOffset += field.length;
                 }
@@ -356,14 +360,12 @@
                 offset += recordLength;
             }
 
-            // Rebuild Recipe Data Object
             recipeData = {};
             let currentSection = "GENERAL INFO";
             recipeData[currentSection] = [];
 
             records.forEach(rec => {
                 let keys = Object.keys(rec);
-                // Robust matching in case column names change slightly
                 let tagKey = keys.find(k => k.includes('NOM')) || keys[0];
                 let valKey = keys.find(k => k.includes('VAL')) || keys[1];
                 let comKey = keys.find(k => k.includes('COM')) || keys[keys.length - 1];
@@ -417,12 +419,14 @@
             }
         }
 
-        function getVal(section, tag) {
-            if(!recipeData[section]) return "0";
-            // Strip all spaces from both tags during search to ensure a 100% match
+        // GLOBAL SEARCH: Searches across all tabs to find variables like PositionLampe that get saved in sub-sections
+        function findTagVal(tag) {
             const cleanTarget = tag.replace(/\s/g, '');
-            const row = recipeData[section].find(r => r.tag.replace(/\s/g, '') === cleanTarget);
-            return row ? row.value.trim() : "0";
+            for (const section in recipeData) {
+                const row = recipeData[section].find(r => r.tag.replace(/\s/g, '') === cleanTarget);
+                if (row) return row.value.trim();
+            }
+            return "0"; // fallback
         }
 
         function toggleView() {
@@ -479,7 +483,7 @@
             // Render Heating Bars (Zones 9 down to 1)
             let barsHtml = '';
             for (let z = 9; z >= 1; z--) {
-                let val = getVal('FOUR', `PourcentageZone${z}`);
+                let val = findTagVal(`PourcentageZone${z}`);
                 let percent = parseFloat(val.replace(',', '.')) || 0;
                 barsHtml += `
                     <div class="bar-row">
@@ -491,11 +495,12 @@
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
 
-            // Render Lamp Grid (Zones 1-9, Ovens 1-16)
+            // Render Lamp Grid Headers (Zones 1-9, Ovens 1-16)
             let ovenHeaders = '<div></div>'; 
             for(let o = 1; o <= 16; o++) {
                 ovenHeaders += `<div>${o}</div>`;
             }
+            ovenHeaders += '<div></div>'; // Spacer for the percentage column on the far right
             document.getElementById('hmiOvenLabels').innerHTML = ovenHeaders;
 
             let gridHtml = '';
@@ -503,21 +508,23 @@
                 gridHtml += `<div class="grid-row-label">${z}</div>`;
                 
                 for(let o = 1; o <= 16; o++) {
-                    // In Sidel data: Zone 1 = PositionLampe2, Oven 1 = array index [0]
                     let tagToSearch = `PositionLampe${z + 1}[${o - 1}]`;
-                    let lampState = getVal('FOUR', tagToSearch);
+                    let lampState = findTagVal(tagToSearch);
                     
-                    // If the value is > 0, it means the lamp is mechanically turned ON
                     let isLampOn = parseFloat(lampState.replace(',', '.')) > 0;
                     let stateClass = isLampOn ? 'on' : 'off';
                     
                     gridHtml += `<div class="lamp ${stateClass}"></div>`;
                 }
+
+                // Add the trailing percentage number for each row
+                let rowVal = findTagVal(`PourcentageZone${z}`);
+                gridHtml += `<div class="grid-row-pct">${rowVal}%</div>`;
             }
             document.getElementById('hmiLampGrid').innerHTML = gridHtml;
 
             // Render Setpoints
-            let tempConsigne = getVal('FOUR', 'TempConsigne');
+            let tempConsigne = findTagVal('TempConsigne');
             document.getElementById('hmiSetpoint1').innerText = tempConsigne + " °C";
         }
     </script>
