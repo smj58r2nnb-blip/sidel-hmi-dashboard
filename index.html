@@ -127,7 +127,6 @@
             display: flex;
             gap: 20px;
             margin-top: 30px;
-            height: 400px;
         }
 
         .hmi-panel {
@@ -238,7 +237,7 @@
         <div class="sidebar" id="sidebar"></div>
         <div class="main-content" id="mainContent">
             
-            <button id="viewToggleBtn" class="view-toggle" style="display:none;" onclick="toggleView()">Show Visual HMI</button>
+            <button id="viewToggleBtn" class="view-toggle" style="display:none;" onclick="toggleView()">Show Raw Variables</button>
 
             <div id="rawView">
                 <h2 id="sectionTitle" style="margin-top:0;">Section</h2>
@@ -255,7 +254,6 @@
             </div>
 
             <div id="hmiView" style="display: none;">
-                
                 <div class="hmi-layout">
                     <div class="hmi-panel heating-panel">
                         <div class="hmi-panel-header">Overall Heating %</div>
@@ -278,7 +276,6 @@
                         </div>
                     </div>
                 </div>
-
             </div>
 
         </div>
@@ -295,47 +292,90 @@
             document.getElementById('recipeName').innerText = file.name;
 
             const reader = new FileReader();
-            reader.onload = (e) => parseRecipe(e.target.result);
-            reader.readAsText(file);
+            reader.onload = (e) => {
+                const buffer = e.target.result;
+                try {
+                    // DBF files use binary structures, so we parse the raw array buffer
+                    processDBF(buffer);
+                } catch (err) {
+                    console.error("DBF Parse failed", err);
+                    alert("Could not read file as DBF. Please ensure it is a valid Sidel export.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
         }
 
-        function parseRecipe(rawText) {
-            const lines = rawText.split('\n');
+        function processDBF(arrayBuffer) {
+            const view = new DataView(arrayBuffer);
+            const numRecords = view.getUint32(4, true);
+            const headerLength = view.getUint16(8, true);
+            const recordLength = view.getUint16(10, true);
+            
+            const fields = [];
+            let offset = 32;
+            
+            // 1. Extract DBF Field Descriptors
+            while (offset < headerLength - 1) {
+                const firstByte = view.getUint8(offset);
+                if (firstByte === 0x0D) break; // End of header
+                
+                let name = "";
+                for (let i = 0; i < 11; i++) {
+                    const charCode = view.getUint8(offset + i);
+                    if (charCode !== 0) name += String.fromCharCode(charCode);
+                }
+                const length = view.getUint8(offset + 16);
+                fields.push({ name: name.trim(), length: length });
+                offset += 32;
+            }
+            
+            // 2. Read Binary Records
+            const records = [];
+            offset = headerLength;
+            const decoder = new TextDecoder('windows-1252'); 
+            
+            for (let i = 0; i < numRecords; i++) {
+                const record = {};
+                let recordOffset = offset + 1; // Skip the deletion flag byte
+                
+                for (let j = 0; j < fields.length; j++) {
+                    const field = fields[j];
+                    const fieldData = new Uint8Array(arrayBuffer, recordOffset, field.length);
+                    record[field.name] = decoder.decode(fieldData).trim();
+                    recordOffset += field.length;
+                }
+                records.push(record);
+                offset += recordLength;
+            }
+
+            // 3. Rebuild Recipe Data Object
             recipeData = {};
             let currentSection = "GENERAL INFO";
-            const headerRegex = /^-+([A-Z0-9_ \-]+)-+$/i;
+            recipeData[currentSection] = [];
 
-            lines.forEach(line => {
-                const trimmedLine = line.trim();
-                if (!trimmedLine) return;
+            records.forEach(rec => {
+                // Sidel typically names columns NOM_TAG, VAL_TAG, COM_TAG
+                let tag = rec.NOM_TAG || Object.values(rec)[0] || "";
+                let val = rec.VAL_TAG || Object.values(rec)[1] || "";
+                let desc = rec.COM_TAG || Object.values(rec)[2] || "";
 
-                if (trimmedLine.startsWith('---')) {
-                    const match = trimmedLine.match(headerRegex);
+                if (!tag && !val && !desc) return;
+
+                // Look for section dividers (e.g. ------FOUR------)
+                if (tag.startsWith('--') || desc.startsWith('--')) {
+                    const textToSearch = tag + " " + desc;
+                    const match = textToSearch.match(/-{4,}([A-Z0-9_ \-]+)-{4,}/i);
                     if (match) {
                         currentSection = match[1].trim();
-                        recipeData[currentSection] = [];
+                        if (!recipeData[currentSection]) recipeData[currentSection] = [];
+                        return;
                     }
-                    return;
                 }
 
-                if (!recipeData[currentSection]) recipeData[currentSection] = [];
-
-                const parts = trimmedLine.split(/\s{2,}/);
-                if (parts.length >= 2) {
-                    let tag = parts[0];
-                    let value = "";
-                    let desc = "";
-
-                    if (parts.length === 2) {
-                        if (parts[1].includes('@(')) desc = parts[1];
-                        else value = parts[1];
-                    } else {
-                        value = parts[1];
-                        desc = parts.slice(2).join(' ');
-                    }
-
+                if (tag && !tag.startsWith('--')) {
+                    // Clean up localization strings
                     desc = desc.replace(/^X/, '').replace(/@\((.*?)\)/g, '$1');
-                    recipeData[currentSection].push({ tag, value, desc });
+                    recipeData[currentSection].push({ tag, value: val, desc });
                 }
             });
 
@@ -376,7 +416,15 @@
         function toggleView() {
             isVisualMode = !isVisualMode;
             document.getElementById('viewToggleBtn').innerText = isVisualMode ? "Show Raw Variables" : "Show Visual HMI";
-            renderSection(currentActiveSection, null);
+            
+            if (isVisualMode) {
+                document.getElementById('rawView').style.display = 'none';
+                document.getElementById('hmiView').style.display = 'block';
+                renderVisualHMI();
+            } else {
+                document.getElementById('rawView').style.display = 'block';
+                document.getElementById('hmiView').style.display = 'none';
+            }
         }
 
         function renderSection(section, clickedElement) {
@@ -388,19 +436,17 @@
             document.getElementById('sectionTitle').innerText = section;
             const toggleBtn = document.getElementById('viewToggleBtn');
 
-            // Only show the HMI toggle button if we are in the "FOUR" section
+            // Force visual mode automatically if FOUR is clicked
             if (section === "FOUR") {
                 toggleBtn.style.display = "block";
-            } else {
-                toggleBtn.style.display = "none";
-                isVisualMode = false; // Force raw view for other tabs
-            }
-
-            if (isVisualMode && section === "FOUR") {
+                isVisualMode = true; 
+                toggleBtn.innerText = "Show Raw Variables";
                 document.getElementById('rawView').style.display = 'none';
                 document.getElementById('hmiView').style.display = 'block';
                 renderVisualHMI();
             } else {
+                toggleBtn.style.display = "none";
+                isVisualMode = false;
                 document.getElementById('rawView').style.display = 'block';
                 document.getElementById('hmiView').style.display = 'none';
                 
@@ -428,16 +474,15 @@
                 barsHtml += `
                     <div class="bar-row">
                         <span class="bar-label">${z}</span>
-                        <span class="bar-val">${val}</span>
+                        <span class="bar-val">${val}%</span>
                         <div class="bar-track"><div class="bar-fill" style="width: ${percent}%;"></div></div>
                     </div>
                 `;
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
 
-            // 2. Render Lamp Grid (Zones 9 down to 1, Ovens 2 to 16 based on DBF structure)
-            // Note: Sidel DBFs usually map PositionLampeX to oven modules.
-            let ovenHeaders = '<div></div>'; // empty corner
+            // 2. Render Lamp Grid (Zones 9 down to 1, Ovens 2 to 16)
+            let ovenHeaders = '<div></div>'; 
             for(let o = 1; o <= 15; o++) {
                 ovenHeaders += `<div>${o}</div>`;
             }
@@ -447,9 +492,8 @@
             for (let z = 9; z >= 1; z--) {
                 gridHtml += `<div class="grid-row-label">${z}</div>`;
                 
-                // Looking for PositionLampe2 through PositionLampe16 (representing ovens 1-15 in data)
+                // PositionLampeX array indexing
                 for(let o = 2; o <= 16; o++) {
-                    // array index corresponds to zone-1
                     let lampState = getVal('FOUR', `PositionLampe${o}[${z-1}]`);
                     let stateClass = (lampState === '1') ? 'on' : 'off';
                     gridHtml += `<div class="lamp ${stateClass}"></div>`;
