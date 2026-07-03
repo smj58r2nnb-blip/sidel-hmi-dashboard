@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidel HMI Recipe Dashboard</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --bg-panel: #1e1e24;
+            --bg-header: #005f9e;
+            --text-main: #e0e0e0;
+            --text-muted: #888;
+            --accent: #4fc1ff;
+            --border-color: #333;
+            --hover-color: #2a2a35;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--bg-header);
+            padding: 15px 20px;
+            font-size: 1.4rem;
+            font-weight: 600;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .input-area {
+            background-color: var(--bg-panel);
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        textarea {
+            flex: 1;
+            height: 60px;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        button {
+            background-color: var(--bg-header);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 12px 24px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            height: 100%;
+        }
+
+        button:hover {
+            background-color: #007acc;
+        }
+
+        .dashboard {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 280px;
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .nav-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.95rem;
+            transition: background-color 0.1s;
+        }
+
+        .nav-item:hover {
+            background-color: var(--hover-color);
+        }
+
+        .nav-item.active {
+            background-color: var(--hover-color);
+            border-left: 4px solid var(--accent);
+            font-weight: bold;
+            color: white;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 20px 30px;
+            overflow-y: auto;
+            background-color: var(--bg-dark);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: white;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: var(--bg-panel);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #25252b;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: var(--hover-color);
+        }
+
+        td.tag-name {
+            font-family: monospace;
+            color: #dcdcaa;
+        }
+
+        td.value {
+            font-weight: bold;
+            color: var(--accent);
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+
+        td.description {
+            color: #4ec9b0;
+            font-size: 0.95rem;
+        }
+        
+        .empty-state {
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 50px;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>Sidel Recipe HMI Dashboard</div>
+    </header>
+
+    <div class="input-area">
+        <textarea id="rawData" placeholder="Paste your raw Sidel recipe text export here..."></textarea>
+        <button onclick="parseRecipe()">Load Recipe</button>
+    </div>
+
+    <div class="dashboard">
+        <div class="sidebar" id="sidebar">
+            <!-- Navigation items injected here -->
+        </div>
+        <div class="main-content" id="mainContent">
+            <div class="empty-state">Paste a recipe and click "Load Recipe" to view variables.</div>
+            <div id="tableContainer" style="display: none;">
+                <h2 id="sectionTitle">Section</h2>
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th width="30%">Tag / Parameter</th>
+                            <th width="20%">Value</th>
+                            <th width="50%">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Data injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let recipeData = {};
+
+        function parseRecipe() {
+            const rawText = document.getElementById('rawData').value;
+            const lines = rawText.split('\n');
+            
+            recipeData = {};
+            let currentSection = "GENERAL INFO";
+            
+            // Regex to find headers like "--------------------FOUR----------"
+            const headerRegex = /^-+([A-Z0-9_ \-]+)-+$/i;
+
+            lines.forEach(line => {
+                const trimmedLine = line.trim();
+                if (!trimmedLine) return;
+
+                // 1. Check for section headers
+                if (trimmedLine.startsWith('---')) {
+                    const match = trimmedLine.match(headerRegex);
+                    if (match) {
+                        currentSection = match[1].trim();
+                        recipeData[currentSection] = [];
+                    }
+                    return;
+                }
+
+                // Initialize section if it doesn't exist
+                if (!recipeData[currentSection]) {
+                    recipeData[currentSection] = [];
+                }
+
+                // 2. Parse variable lines
+                // Sidel logs typically separate columns with multiple spaces
+                const parts = trimmedLine.split(/\s{2,}/);
+                
+                if (parts.length >= 2) {
+                    let tag = parts[0];
+                    let value = "";
+                    let desc = "";
+
+                    if (parts.length === 2) {
+                        // Sometimes value is empty and it jumps straight to description
+                        if (parts[1].includes('@(')) {
+                            desc = parts[1];
+                        } else {
+                            value = parts[1];
+                        }
+                    } else {
+                        value = parts[1];
+                        desc = parts.slice(2).join(' '); // Combine remaining parts into description
+                    }
+
+                    // 3. Clean up formatting
+                    // Remove leading 'X', remove '@(' and ')' localized string wrappers
+                    desc = desc.replace(/^X/, '');
+                    desc = desc.replace(/@\((.*?)\)/g, '$1');
+
+                    recipeData[currentSection].push({ tag, value, desc });
+                }
+            });
+
+            renderSidebar();
+        }
+
+        function renderSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.innerHTML = '';
+            
+            let isFirst = true;
+            
+            for (const section in recipeData) {
+                if (recipeData[section].length === 0) continue; // Skip empty sections
+                
+                const navItem = document.createElement('div');
+                navItem.className = 'nav-item';
+                navItem.innerText = section;
+                navItem.onclick = () => renderTable(section, navItem);
+                
+                sidebar.appendChild(navItem);
+                
+                // Auto-load the first section
+                if (isFirst) {
+                    renderTable(section, navItem);
+                    isFirst = false;
+                }
+            }
+
+            if (Object.keys(recipeData).length === 0) {
+                document.querySelector('.empty-state').style.display = 'block';
+                document.querySelector('.empty-state').innerText = "No readable data found. Please check the pasted text.";
+                document.getElementById('tableContainer').style.display = 'none';
+            } else {
+                document.querySelector('.empty-state').style.display = 'none';
+                document.getElementById('tableContainer').style.display = 'block';
+            }
+        }
+
+        function renderTable(section, clickedElement) {
+            // Update active state in sidebar
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            if (clickedElement) clickedElement.classList.add('active');
+
+            // Update Header
+            document.getElementById('sectionTitle').innerText = section;
+            
+            // Populate Table
+            const tbody = document.querySelector('#dataTable tbody');
+            tbody.innerHTML = '';
+
+            recipeData[section].forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="tag-name">${row.tag}</td>
+                    <td class="value">${row.value}</td>
+                    <td class="description">${row.desc}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
