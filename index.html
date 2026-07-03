@@ -66,6 +66,8 @@
             background-color: #fff;
             border-right: 1px solid var(--border);
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
         }
 
         .nav-item {
@@ -173,7 +175,6 @@
         .lamp-panel { flex: 1; padding-bottom: 15px;}
         .grid-container {
             display: grid;
-            /* 16 Ovens + 1 column at the end for the hardcoded percentages */
             grid-template-columns: 30px repeat(16, 1fr) 45px;
             gap: 4px;
             padding: 15px;
@@ -312,23 +313,18 @@
                 const buffer = e.target.result;
                 const view = new DataView(buffer);
                 
-                // HYBRID PARSER: Check if it's a real DBF file or just a text file renamed to .DBF
+                // HYBRID PARSER: Ensures it correctly reads the DBF binary format
                 if (buffer.byteLength > 0 && view.getUint8(0) === 0x03) {
                     try {
                         processBinaryDBF(buffer);
                     } catch (err) {
-                        console.error("Binary DBF failed, falling back to text...", err);
-                        processTextFile(buffer);
+                        console.error("DBF parse error", err);
                     }
-                } else {
-                    // File is actually a text/csv file
-                    processTextFile(buffer);
                 }
             };
             reader.readAsArrayBuffer(file);
         }
 
-        // 1. Binary DBF Engine
         function processBinaryDBF(arrayBuffer) {
             const view = new DataView(arrayBuffer);
             const numRecords = view.getUint32(4, true);
@@ -369,54 +365,22 @@
                 offset += recordLength;
             }
 
-            buildRecipeData(records);
-        }
-
-        // 2. Fallback Text Engine (For corrupted or renamed files like JK.DBF)
-        function processTextFile(arrayBuffer) {
-            const decoder = new TextDecoder('windows-1252');
-            const rawText = decoder.decode(arrayBuffer);
-            const lines = rawText.split('\n');
-            const records = [];
-
-            lines.forEach(line => {
-                const trimmed = line.trim();
-                if (!trimmed) return;
-                
-                const parts = trimmed.split(/\s{2,}/); // Split by multiple spaces
-                if (parts.length >= 2) {
-                    records.push({
-                        TAG: parts[0],
-                        VAL: parts[1],
-                        COM: parts.length > 2 ? parts.slice(2).join(' ') : ""
-                    });
-                }
-            });
-
-            buildRecipeData(records);
-        }
-
-        // Rebuild the data object based on sections
-        function buildRecipeData(records) {
             recipeData = {};
             let currentSection = "GENERAL INFO";
             recipeData[currentSection] = [];
 
             records.forEach(rec => {
                 let keys = Object.keys(rec);
-                // Dynamically find Tag and Value columns no matter what language the factory saved them in
-                let tagKey = keys.find(k => k.toUpperCase().includes('TAG') || k.toUpperCase().includes('NOM')) || keys[0];
-                let valKey = keys.find(k => k.toUpperCase().includes('VAL')) || keys[1];
-                let comKey = keys.find(k => k.toUpperCase().includes('COM')) || keys[keys.length - 1];
+                let tagKey = keys.find(k => k.includes('NOM')) || keys[0];
+                let valKey = keys.find(k => k.includes('VAL')) || keys[1];
+                let comKey = keys.find(k => k.includes('COM')) || keys[keys.length - 1];
 
                 let tag = rec[tagKey] ? rec[tagKey] : "";
                 let val = rec[valKey] ? rec[valKey] : "";
                 let desc = rec[comKey] ? rec[comKey] : "";
 
-                // If Sidel merged the value into the description column
                 if (val.includes('@(') && !desc) {
-                    desc = val;
-                    val = "";
+                    desc = val; val = "";
                 }
 
                 if (!tag && !val && !desc) return;
@@ -464,7 +428,7 @@
             }
         }
 
-        // AGGRESSIVE SEARCH: Cleans invisible characters, spaces, and formatting before matching
+        // GLOBAL SEARCH: Cleans characters to ensure a 100% exact match across all sections
         function cleanStr(str) {
             return str.replace(/[^a-zA-Z0-9_\[\]]/g, '').toLowerCase();
         }
@@ -475,7 +439,7 @@
                 const row = recipeData[section].find(r => cleanStr(r.tag) === cleanTarget);
                 if (row) return row.value.trim();
             }
-            return "0"; // fallback
+            return "0"; 
         }
 
         function toggleView() {
@@ -529,7 +493,6 @@
         }
 
         function renderVisualHMI() {
-            // Find the master general heating multiplier (usually ~80%)
             let generalHeatingStr = findTagVal('PourcentChauffeDemar');
             let generalHeating = parseFloat(generalHeatingStr.replace(',', '.')) || 100;
 
@@ -539,7 +502,6 @@
                 let valStr = findTagVal(`PourcentageZone${z}`);
                 let zonePct = parseFloat(valStr.replace(',', '.')) || 0;
                 
-                // Mimic the physical machine's 'Live' overall heating bar by applying the General Heating % multiplier
                 let overallPct = (zonePct * generalHeating) / 100;
                 
                 barsHtml += `
@@ -557,27 +519,30 @@
             for(let o = 1; o <= 16; o++) {
                 ovenHeaders += `<div>${o}</div>`;
             }
-            ovenHeaders += '<div>%</div>'; // Spacer for the percentages column on the far right
+            ovenHeaders += '<div>%</div>'; // Spacer for percentage
             document.getElementById('hmiOvenLabels').innerHTML = ovenHeaders;
 
             let gridHtml = '';
             for (let z = 9; z >= 1; z--) {
                 gridHtml += `<div class="grid-row-label">${z}</div>`;
                 
+                let zonePctStr = findTagVal(`PourcentageZone${z}`);
+                let zonePct = parseFloat(zonePctStr.replace(',', '.')) || 0;
+
                 // Draw Matrix
                 for(let o = 1; o <= 16; o++) {
                     let tagToSearch = `PositionLampe${z + 1}[${o - 1}]`;
                     let lampState = findTagVal(tagToSearch);
                     
-                    let isLampOn = parseFloat(lampState.replace(',', '.')) > 0;
+                    // CRITICAL FIX: The lamp is ONLY orange if it is mechanically enabled (> 0)
+                    // AND the zone's heating percentage is actually greater than 0%.
+                    let isLampOn = (parseFloat(lampState.replace(',', '.')) > 0) && (zonePct > 0);
                     let stateClass = isLampOn ? 'on' : 'off';
                     
                     gridHtml += `<div class="lamp ${stateClass}"></div>`;
                 }
 
-                // Add the hardcoded zone percentage strictly to the right side of the matrix
-                let zonePctStr = findTagVal(`PourcentageZone${z}`);
-                let zonePct = parseFloat(zonePctStr.replace(',', '.')) || 0;
+                // Add the hardcoded zone percentage to the right of the matrix
                 gridHtml += `<div class="grid-row-pct">${zonePct}%</div>`;
             }
             document.getElementById('hmiLampGrid').innerHTML = gridHtml;
