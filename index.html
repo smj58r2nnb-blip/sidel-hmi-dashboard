@@ -218,14 +218,22 @@
             color: #1a3450;
             box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1);
         }
-
     </style>
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({pageLanguage: 'fr', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </head>
 <body>
 
     <header>
-        <div>SIDEL DBF VIEWER</div>
-        <div id="recipeName" style="font-size: 0.9rem; font-weight: normal;">No file loaded</div>
+        <div style="display:flex; align-items:center; gap: 20px;">
+            <div>SIDEL DBF VIEWER</div>
+            <div id="recipeName" style="font-size: 0.9rem; font-weight: normal;">No file loaded</div>
+        </div>
+        <div id="google_translate_element"></div>
     </header>
 
     <div class="upload-area">
@@ -295,7 +303,6 @@
             reader.onload = (e) => {
                 const buffer = e.target.result;
                 try {
-                    // DBF files use binary structures, so we parse the raw array buffer
                     processDBF(buffer);
                 } catch (err) {
                     console.error("DBF Parse failed", err);
@@ -314,7 +321,7 @@
             const fields = [];
             let offset = 32;
             
-            // 1. Extract DBF Field Descriptors
+            // Extract DBF Field Descriptors
             while (offset < headerLength - 1) {
                 const firstByte = view.getUint8(offset);
                 if (firstByte === 0x0D) break; // End of header
@@ -329,14 +336,14 @@
                 offset += 32;
             }
             
-            // 2. Read Binary Records
+            // Read Binary Records
             const records = [];
             offset = headerLength;
             const decoder = new TextDecoder('windows-1252'); 
             
             for (let i = 0; i < numRecords; i++) {
                 const record = {};
-                let recordOffset = offset + 1; // Skip the deletion flag byte
+                let recordOffset = offset + 1; 
                 
                 for (let j = 0; j < fields.length; j++) {
                     const field = fields[j];
@@ -348,23 +355,22 @@
                 offset += recordLength;
             }
 
-            // 3. Rebuild Recipe Data Object
+            // Rebuild Recipe Data Object
             recipeData = {};
             let currentSection = "GENERAL INFO";
             recipeData[currentSection] = [];
 
             records.forEach(rec => {
-                // Sidel typically names columns NOM_TAG, VAL_TAG, COM_TAG
                 let tag = rec.NOM_TAG || Object.values(rec)[0] || "";
                 let val = rec.VAL_TAG || Object.values(rec)[1] || "";
                 let desc = rec.COM_TAG || Object.values(rec)[2] || "";
 
                 if (!tag && !val && !desc) return;
 
-                // Look for section dividers (e.g. ------FOUR------)
-                if (tag.startsWith('--') || desc.startsWith('--')) {
+                // FIX: Strictly capture only letters/numbers/spaces, discarding all dashes
+                if (tag.includes('--') || desc.includes('--')) {
                     const textToSearch = tag + " " + desc;
-                    const match = textToSearch.match(/-{4,}([A-Z0-9_ \-]+)-{4,}/i);
+                    const match = textToSearch.match(/-{3,}([A-Za-z0-9_ ]+?)-{3,}/);
                     if (match) {
                         currentSection = match[1].trim();
                         if (!recipeData[currentSection]) recipeData[currentSection] = [];
@@ -373,7 +379,6 @@
                 }
 
                 if (tag && !tag.startsWith('--')) {
-                    // Clean up localization strings
                     desc = desc.replace(/^X/, '').replace(/@\((.*?)\)/g, '$1');
                     recipeData[currentSection].push({ tag, value: val, desc });
                 }
