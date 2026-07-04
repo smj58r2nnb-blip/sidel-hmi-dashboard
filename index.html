@@ -204,7 +204,7 @@
             border-right: 1px solid #c77b00;
         }
 
-        /* Lamp Grid */
+        /* Lamp Grid (Explicit Coordinates used to prevent collapse) */
         .lamp-panel { flex: 0.6; }
         
         .grid-container {
@@ -214,23 +214,20 @@
             padding: 10px 15px 15px 15px;
             align-items: center;
             position: relative;
-            z-index: 1;
         }
         
         .bg-penetration {
-            grid-row: 1 / span 10;
             background-color: #6a95c2;
             margin: -5px -2.5px;
-            z-index: -1;
+            z-index: 0;
             border-radius: 4px 0 0 4px;
             box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1);
         }
 
         .bg-distribution {
-            grid-row: 1 / span 10;
             background-color: #8eb5db;
             margin: -5px -2.5px;
-            z-index: -1;
+            z-index: 0;
             border-radius: 0 4px 4px 0;
             box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1);
         }
@@ -241,16 +238,18 @@
             font-weight: bold;
             color: #1a3450;
             padding-bottom: 5px;
+            z-index: 1;
         }
 
-        .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; }
-        .grid-row-pct { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; }
+        .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; z-index: 1; }
+        .grid-row-pct { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; z-index: 1; }
         
         .lamp {
             height: 12px;
             border: 1px solid #555;
             border-radius: 2px;
             box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+            z-index: 1;
         }
         
         /* WATTAGE COLOR CODING */
@@ -268,7 +267,7 @@
             background-color: var(--lamp-off); 
         }
 
-        /* Small Data Boxes (Setpoints, Checks) */
+        /* Small Data Boxes */
         .data-row {
             display: flex;
             justify-content: space-between;
@@ -293,7 +292,6 @@
         hr { border: 0; border-top: 1px solid #b0c0d0; width: 100%; margin: 5px 0; }
 
     </style>
-    <!-- Google Translate Script -->
     <script type="text/javascript">
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({pageLanguage: 'fr', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
@@ -340,11 +338,9 @@
                 </table>
             </div>
 
-            <!-- SIDEL HMI VISUALIZATION -->
             <div id="hmiView" style="display: none;">
                 <div class="hmi-layout">
                     
-                    <!-- Row 1: Heating % and Lamps -->
                     <div class="hmi-row">
                         <div class="hmi-panel heating-panel">
                             <div class="hmi-panel-header">Overall Heating %</div>
@@ -360,7 +356,6 @@
                         </div>
                     </div>
 
-                    <!-- Row 2: Setpoints and Personalization -->
                     <div class="hmi-row">
                         <div class="hmi-panel">
                             <div class="hmi-panel-header">Oven</div>
@@ -614,7 +609,6 @@
         function renderVisualHMI() {
             let generalHeating = parseFloat(findTagVal('PourcentChauffeDemar').replace(',', '.')) || 100;
 
-            // Render Heating Bars
             let barsHtml = '';
             for (let z = 9; z >= 1; z--) {
                 let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
@@ -623,38 +617,53 @@
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
 
-            // Render Lamp Grid
             let gridHtml = '';
             
-            // BACKGROUND SPLIT: Ovens 1-8 Penetration (Dark Blue), 9-16 Distribution (Light Blue)
-            gridHtml += `<div class="bg-penetration" style="grid-column: 2 / span 8;"></div>`;
-            gridHtml += `<div class="bg-distribution" style="grid-column: 10 / span 8;"></div>`;
+            // BULLETPROOF GRID: Explicit coordinates so the backgrounds don't break the layout
+            gridHtml += `<div class="bg-penetration" style="grid-row: 1 / span 10; grid-column: 2 / span 8;"></div>`;
+            gridHtml += `<div class="bg-distribution" style="grid-row: 1 / span 10; grid-column: 10 / span 8;"></div>`;
 
-            // Row 1: Oven Headers
-            gridHtml += `<div></div>`; 
-            for(let o = 1; o <= 16; o++) gridHtml += `<div class="col-header">${o}</div>`;
-            gridHtml += `<div class="col-header">%</div>`;
+            // Row 1: Oven Headers explicitly placed
+            gridHtml += `<div style="grid-row: 1; grid-column: 1;"></div>`; 
+            for(let o = 1; o <= 16; o++) {
+                gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: ${o + 1};">${o}</div>`;
+            }
+            gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: 18;">%</div>`;
 
-            // Rows 2-10: Lamps
+            // Rows 2-10: Lamps explicitly placed
+            let rowIndex = 2;
             for (let z = 9; z >= 1; z--) {
-                gridHtml += `<div class="grid-row-label">${z}</div>`;
+                gridHtml += `<div class="grid-row-label" style="grid-row: ${rowIndex}; grid-column: 1;">${z}</div>`;
                 let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
 
                 for(let o = 1; o <= 16; o++) {
+                    // 1. Bitmask Decoding: Is the lamp ON?
                     let ovenValStr = findTagVal(`RetourEtatLampeFour${o}`);
                     let ovenBitmask = parseInt(ovenValStr, 10) || 0;
-                    
-                    // Decode Bitmask for ON/OFF
                     let isLampOn = (ovenBitmask & (1 << (z - 1))) !== 0;
-                    
-                    // WATTAGE COLOR CODING
-                    // In Sidel, Zones 1-6 are 3000W (Yellow) and 7-9 are 2500W (Orange) based on your machine's physical layout
-                    let wattageColorClass = (z <= 6) ? 'yellow' : 'orange';
-                    
+
+                    // 2. Hardware Decoding: What Wattage is the bulb?
+                    let powerRatingStr = findTagVal(`PositionLampe${z + 1}[${o - 1}]`);
+                    let powerVal = parseFloat(powerRatingStr.replace(',', '.')) || 0;
+
+                    let wattageColorClass = 'orange'; // Default to 2500W
+                    if (powerVal === 3000) {
+                        wattageColorClass = 'yellow';
+                    } else if (powerVal === 2500) {
+                        wattageColorClass = 'orange';
+                    } else if (powerVal > 0 && z >= 4) {
+                        wattageColorClass = 'yellow'; // Fallback if machine just returns "1"
+                    }
+
+                    // Double-check safety: if PositionLampe is 0, the lamp is mechanically missing
+                    if (powerVal === 0) isLampOn = false;
+
                     let stateClass = isLampOn ? wattageColorClass : 'off';
-                    gridHtml += `<div class="lamp ${stateClass}"></div>`;
+                    
+                    gridHtml += `<div class="lamp ${stateClass}" style="grid-row: ${rowIndex}; grid-column: ${o + 1};"></div>`;
                 }
-                gridHtml += `<div class="grid-row-pct">${zonePct}</div>`;
+                gridHtml += `<div class="grid-row-pct" style="grid-row: ${rowIndex}; grid-column: 18;">${zonePct}</div>`;
+                rowIndex++;
             }
             document.getElementById('hmiLampGrid').innerHTML = gridHtml;
 
