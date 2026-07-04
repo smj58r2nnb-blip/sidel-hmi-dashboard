@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidel HMI Visual Dashboard</title>
+    <title>Sidel HMI Pro</title>
     <style>
         :root {
             --bg-main: #2b3e50;
@@ -38,6 +38,7 @@
             align-items: center;
             border-bottom: 2px solid #1a3450;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 10;
         }
 
         .upload-area {
@@ -109,6 +110,15 @@
         }
 
         .view-toggle:hover { background-color: #4a77a8; }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            color: #a3c4e0;
+            font-size: 1.5rem;
+            margin-top: 100px;
+            font-weight: bold;
+        }
 
         /* RAW TABLE STYLE */
         #rawView {
@@ -268,9 +278,13 @@
         <div class="sidebar" id="sidebar"></div>
         <div class="main-content" id="mainContent">
             
+            <div id="emptyState" class="empty-state">
+                Please upload a Sidel recipe file to view the HMI Dashboard.
+            </div>
+
             <button id="viewToggleBtn" class="view-toggle" style="display:none;" onclick="toggleView()">Show Raw Variables</button>
 
-            <div id="rawView">
+            <div id="rawView" style="display: none;">
                 <h2 id="sectionTitle" style="margin-top:0;">Section</h2>
                 <table id="dataTable">
                     <thead>
@@ -322,12 +336,14 @@
             if (!file) return;
             document.getElementById('recipeName').innerText = file.name;
 
+            // Hide empty state once a file is selected
+            document.getElementById('emptyState').style.display = 'none';
+
             const reader = new FileReader();
             reader.onload = (e) => {
                 const buffer = e.target.result;
                 const view = new DataView(buffer);
                 
-                // HYBRID PARSER: Check if it's a real DBF file or just a text file renamed to .DBF
                 if (buffer.byteLength > 0 && view.getUint8(0) === 0x03) {
                     try {
                         processBinaryDBF(buffer);
@@ -342,7 +358,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // 1. Binary DBF Engine
         function processBinaryDBF(arrayBuffer) {
             const view = new DataView(arrayBuffer);
             const numRecords = view.getUint32(4, true);
@@ -386,7 +401,6 @@
             buildRecipeData(records);
         }
 
-        // 2. Fallback Text Engine
         function processTextFile(arrayBuffer) {
             const decoder = new TextDecoder('windows-1252');
             const rawText = decoder.decode(arrayBuffer);
@@ -542,7 +556,6 @@
             let generalHeatingStr = findTagVal('PourcentChauffeDemar');
             let generalHeating = parseFloat(generalHeatingStr.replace(',', '.')) || 100;
 
-            // 1. Render Heating Bars (Left Side) - Calculated Theoretical Output
             let barsHtml = '';
             for (let z = 9; z >= 1; z--) {
                 let valStr = findTagVal(`PourcentageZone${z}`);
@@ -560,12 +573,11 @@
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
 
-            // 2. Render Lamp Grid Headers (Right Side)
             let ovenHeaders = '<div></div>'; 
             for(let o = 1; o <= 16; o++) {
                 ovenHeaders += `<div>${o}</div>`;
             }
-            ovenHeaders += '<div>%</div>'; // Spacer for percentage
+            ovenHeaders += '<div>%</div>'; 
             document.getElementById('hmiOvenLabels').innerHTML = ovenHeaders;
 
             let gridHtml = '';
@@ -575,25 +587,20 @@
                 let zonePctStr = findTagVal(`PourcentageZone${z}`);
                 let zonePct = parseFloat(zonePctStr.replace(',', '.')) || 0;
 
-                // Draw Matrix
                 for(let o = 1; o <= 16; o++) {
                     let tagToSearch = `PositionLampe${z + 1}[${o - 1}]`;
                     let lampState = findTagVal(tagToSearch);
                     
-                    // CRITICAL LOGIC: The lamp is ONLY orange if it is mechanically enabled (> 0)
-                    // AND the zone's heating percentage is actually greater than 0%.
                     let isLampOn = (parseFloat(lampState.replace(',', '.')) > 0) && (zonePct > 0);
                     let stateClass = isLampOn ? 'on' : 'off';
                     
                     gridHtml += `<div class="lamp ${stateClass}"></div>`;
                 }
 
-                // Add the hardcoded zone percentage to the right of the matrix
                 gridHtml += `<div class="grid-row-pct">${zonePct}%</div>`;
             }
             document.getElementById('hmiLampGrid').innerHTML = gridHtml;
 
-            // 3. Render Setpoints
             let tempConsigne = findTagVal('TempConsigne');
             document.getElementById('hmiSetpoint1').innerText = tempConsigne + " °C";
         }
