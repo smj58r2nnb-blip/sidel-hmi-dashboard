@@ -190,8 +190,8 @@
         }
         .bar-fill {
             height: 100%;
-            background: linear-gradient(to bottom, #ffcca6, #ff7700);
-            border-right: 1px solid #c75500;
+            background: linear-gradient(to bottom, #ffcca6, #ff9d00);
+            border-right: 1px solid #c77b00;
         }
 
         /* Lamp Grid */
@@ -578,7 +578,6 @@
         function renderVisualHMI() {
             let generalHeating = parseFloat(findTagVal('PourcentChauffeDemar').replace(',', '.')) || 100;
 
-            // Render Heating Bars with Math.round() for exact display matching
             let barsHtml = '';
             for (let z = 9; z >= 1; z--) {
                 let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
@@ -587,7 +586,6 @@
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
 
-            // Render Lamp Grid
             let ovenHeaders = '<div></div>'; 
             for(let o = 1; o <= 16; o++) ovenHeaders += `<div>${o}</div>`;
             ovenHeaders += '<div>%</div>';
@@ -598,8 +596,9 @@
                 gridHtml += `<div class="grid-row-label">${z}</div>`;
                 let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
 
-                // Color mapping: Zones 1 to 6 are 3000W (Yellow), Zones 7 to 9 are 2500W (Orange)
-                let wattageColorClass = (z <= 6) ? 'yellow' : 'orange';
+                // FIX: Zones 4 through 9 (Top 6 rows on screen, body of preform) are 3000W Yellow. 
+                // Zones 1 through 3 (Bottom 3 rows on screen, neck of preform) are 2500W Orange.
+                let wattageColorClass = (z >= 4) ? 'yellow' : 'orange';
 
                 for(let o = 1; o <= 16; o++) {
                     let ovenValStr = findTagVal(`RetourEtatLampeFour${o}`);
@@ -614,7 +613,6 @@
             }
             document.getElementById('hmiLampGrid').innerHTML = gridHtml;
 
-            // Render Extracted Data Panels
             document.getElementById('hmiSpTemp').innerText = findTagVal('TempConsigne') + " °C";
             document.getElementById('hmiSpVent').innerText = findTagVal('PourcentVentil') + " %";
             document.getElementById('hmiSpStandby').innerText = findTagVal('PourcentChauffeVeille') + " %";
