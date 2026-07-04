@@ -212,7 +212,24 @@
             color: #1a3450;
             margin-bottom: 5px;
         }
-        .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; }
+        
+        /* Interactive Zone Toggles */
+        .grid-row-label { 
+            font-weight: bold; 
+            font-size: 0.9rem; 
+            text-align: right; 
+            padding-right: 10px; 
+        }
+        .zone-toggle {
+            cursor: pointer;
+            color: #2b4f76;
+            transition: all 0.2s;
+        }
+        .zone-toggle:hover {
+            color: #ff9d00;
+            text-shadow: 0 0 5px rgba(255, 157, 0, 0.5);
+        }
+        
         .grid-row-pct { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; }
         .lamp {
             height: 12px;
@@ -236,7 +253,7 @@
             background-color: var(--lamp-off); 
         }
 
-        /* Small Data Boxes (Setpoints, Checks) */
+        /* Small Data Boxes */
         .data-row {
             display: flex;
             justify-content: space-between;
@@ -317,7 +334,12 @@
                         </div>
 
                         <div class="hmi-panel lamp-panel">
-                            <div class="hmi-panel-header">Lamp Set-Up (Ovens)</div>
+                            <div class="hmi-panel-header">
+                                Lamp Set-Up (Ovens) 
+                                <span style="font-size: 0.75rem; color: #888; text-transform: none; margin-left: 10px;">
+                                    (Click Zone # to toggle 3000W/2500W)
+                                </span>
+                            </div>
                             <div class="panel-body">
                                 <div class="oven-numbers" id="hmiOvenLabels"></div>
                                 <div class="grid-container" id="hmiLampGrid"></div>
@@ -378,6 +400,26 @@
     </div>
 
     <script>
+        // Dynamically pull the yellow zones from your browser's memory.
+        // If it's your first time opening the page, it defaults to the top 6 rows.
+        let yellowZones = JSON.parse(localStorage.getItem('sidelYellowZones')) || [4, 5, 6, 7, 8, 9];
+
+        function toggleZoneColor(zoneNumber) {
+            if (yellowZones.includes(zoneNumber)) {
+                // If it is currently yellow, remove it to make it orange
+                yellowZones = yellowZones.filter(val => val !== zoneNumber);
+            } else {
+                // If it is currently orange, add it to make it yellow
+                yellowZones.push(zoneNumber);
+            }
+            
+            // Save the new layout to the browser memory so it remembers for tomorrow
+            localStorage.setItem('sidelYellowZones', JSON.stringify(yellowZones));
+            
+            // Redraw the screen immediately
+            renderVisualHMI();
+        }
+
         let recipeData = {};
         let currentActiveSection = "";
         let isVisualMode = false;
@@ -593,12 +635,13 @@
 
             let gridHtml = '';
             for (let z = 9; z >= 1; z--) {
-                gridHtml += `<div class="grid-row-label">${z}</div>`;
+                // ADDED: The interactive zone toggle feature
+                gridHtml += `<div class="grid-row-label zone-toggle" onclick="toggleZoneColor(${z})" title="Click to swap between 3000W and 2500W">${z}</div>`;
+                
                 let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
 
-                // FIX: Zones 4 through 9 (Top 6 rows on screen, body of preform) are 3000W Yellow. 
-                // Zones 1 through 3 (Bottom 3 rows on screen, neck of preform) are 2500W Orange.
-                let wattageColorClass = (z >= 4) ? 'yellow' : 'orange';
+                // Check the live array to see if the user has painted this row yellow
+                let wattageColorClass = yellowZones.includes(z) ? 'yellow' : 'orange';
 
                 for(let o = 1; o <= 16; o++) {
                     let ovenValStr = findTagVal(`RetourEtatLampeFour${o}`);
