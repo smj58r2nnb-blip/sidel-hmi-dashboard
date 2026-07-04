@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidel HMI </title>
+    <title>Sidel HMI Pro</title>
     <style>
         :root {
             --bg-main: #2b3e50;
@@ -204,7 +204,7 @@
             border-right: 1px solid #c77b00;
         }
 
-        /* Lamp Grid */
+        /* Lamp Grid (Explicit Coordinates used to prevent collapse) */
         .lamp-panel { flex: 0.6; }
         
         .grid-container {
@@ -265,13 +265,14 @@
             z-index: 1;
         }
         
+        /* WATTAGE COLOR CODING */
         .lamp.yellow { 
-            background-color: #ffea00;
+            background-color: #ffea00; /* 3000W */
             border-color: #cca400;
             box-shadow: 0 0 6px rgba(255, 234, 0, 0.6), inset 1px 1px 2px rgba(255,255,255,0.6);
         }
         .lamp.orange { 
-            background-color: #ff7700;
+            background-color: #ff7700; /* 2500W */
             border-color: #c75500;
             box-shadow: 0 0 6px rgba(255, 119, 0, 0.6), inset 1px 1px 2px rgba(255,255,255,0.6);
         }
@@ -279,7 +280,7 @@
             background-color: var(--lamp-off); 
         }
 
-        /* Data Boxes */
+        /* Small Data Boxes */
         .data-row {
             display: flex;
             justify-content: space-between;
@@ -363,7 +364,7 @@
                             <div class="hmi-panel-header">LAMP SET-UP (OVENS)</div>
                             <div class="hmi-sub-header">
                                 PENETRATION / DISTRIBUTION<br>
-                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Click Oven # to set split. Click Zone # to toggle 3000W rows.)</span>
+                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Click Oven # to set split. Click Zone # to set 3000W rows.)</span>
                             </div>
                             <div class="panel-body" style="padding-top: 5px;">
                                 <div class="grid-container" id="hmiLampGrid"></div>
@@ -424,87 +425,44 @@
     </div>
 
     <script>
-        // ============================================================
-        // PERSISTENT INTERACTIVE STATE
-        // Namespaced per file so different recipes don't share settings
-        // ============================================================
-        let currentFileName = '';
-        let yellowZones     = new Set([4,5,6,7,8,9]);
-        let penetrationSplit = 8;
-
-        function persistKey(key) {
-            return 'sidelHMI_' + currentFileName + '_' + key;
-        }
-
-        function loadPersistedState() {
-            try {
-                const yz = localStorage.getItem(persistKey('yellowZones'));
-                yellowZones = yz ? new Set(JSON.parse(yz)) : new Set([4,5,6,7,8,9]);
-                const ps = localStorage.getItem(persistKey('penetrationSplit'));
-                penetrationSplit = ps ? parseInt(ps, 10) : 8;
-            } catch(_) {
-                yellowZones = new Set([4,5,6,7,8,9]);
-                penetrationSplit = 8;
-            }
-        }
-
-        function savePersistedState() {
-            try {
-                localStorage.setItem(persistKey('yellowZones'), JSON.stringify([...yellowZones]));
-                localStorage.setItem(persistKey('penetrationSplit'), String(penetrationSplit));
-            } catch(_) {}
-        }
+        // INTERACTIVE STATE MANAGEMENT
+        let yellowZones = JSON.parse(localStorage.getItem('sidelYellowZones')) || [4, 5, 6, 7, 8, 9];
+        let penetrationSplit = parseInt(localStorage.getItem('sidelPenetrationSplit'), 10) || 8;
 
         function toggleZoneColor(zoneNumber) {
-            if (yellowZones.has(zoneNumber)) {
-                yellowZones.delete(zoneNumber);
+            if (yellowZones.includes(zoneNumber)) {
+                yellowZones = yellowZones.filter(val => val !== zoneNumber);
             } else {
-                yellowZones.add(zoneNumber);
+                yellowZones.push(zoneNumber);
             }
-            savePersistedState();
+            localStorage.setItem('sidelYellowZones', JSON.stringify(yellowZones));
             renderVisualHMI();
         }
 
         function setPenetrationSplit(ovenNumber) {
             penetrationSplit = ovenNumber;
-            savePersistedState();
+            localStorage.setItem('sidelPenetrationSplit', penetrationSplit);
             renderVisualHMI();
         }
 
-        // ============================================================
-        // CORE STATE
-        // ============================================================
         let recipeData = {};
-        let tagIndex   = {};          // O(1) tag lookup built once on load
-        let currentActiveSection = '';
+        let currentActiveSection = "";
         let isVisualMode = false;
 
-        // ============================================================
-        // FILE LOADING
-        // ============================================================
         function loadFile() {
             const file = document.getElementById('fileInput').files[0];
             if (!file) return;
-
-            currentFileName = file.name;
             document.getElementById('recipeName').innerText = file.name;
             document.getElementById('emptyState').style.display = 'none';
-
-            loadPersistedState();
 
             const reader = new FileReader();
             reader.onload = (e) => {
                 const buffer = e.target.result;
-                const view   = new DataView(buffer);
-
-                // DBF magic bytes: 0x03 dBASE III, 0x83 with memo, 0x8B dBASE IV
-                const firstByte = buffer.byteLength > 0 ? view.getUint8(0) : 0;
-                if (firstByte === 0x03 || firstByte === 0x83 || firstByte === 0x8B) {
-                    try { processBinaryDBF(buffer); }
-                    catch (err) {
-                        console.warn('DBF parse failed, trying text:', err);
-                        processTextFile(buffer);
-                    }
+                const view = new DataView(buffer);
+                
+                if (buffer.byteLength > 0 && view.getUint8(0) === 0x03) {
+                    try { processBinaryDBF(buffer); } 
+                    catch (err) { processTextFile(buffer); }
                 } else {
                     processTextFile(buffer);
                 }
@@ -512,116 +470,81 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // ============================================================
-        // DBF BINARY PARSER — fixed version
-        // Changes vs original:
-        //   1. Bounds check on field loop to prevent overrun
-        //   2. Null-terminate field names correctly
-        //   3. Skip deleted records (deletion flag 0x2A = '*')
-        //   4. Guard recStart + recordLength against buffer end
-        // ============================================================
         function processBinaryDBF(arrayBuffer) {
-            const view         = new DataView(arrayBuffer);
-            const numRecords   = view.getUint32(4,  true);
-            const headerLength = view.getUint16(8,  true);
+            const view = new DataView(arrayBuffer);
+            const numRecords = view.getUint32(4, true);
+            const headerLength = view.getUint16(8, true);
             const recordLength = view.getUint16(10, true);
-            const decoder      = new TextDecoder('windows-1252');
-
-            // --- Parse field descriptors ---
+            
             const fields = [];
-            let offset   = 32;
-
-            while (offset + 32 <= headerLength) {
-                // Terminator byte signals end of field descriptors
-                if (view.getUint8(offset) === 0x0D) break;
-
-                // Field name: first 11 bytes, null-padded
-                let name = '';
+            let offset = 32;
+            
+            while (offset < headerLength - 1) {
+                const firstByte = view.getUint8(offset);
+                if (firstByte === 0x0D) break; 
+                let name = "";
                 for (let i = 0; i < 11; i++) {
-                    const b = view.getUint8(offset + i);
-                    if (b === 0) break;          // null terminator
-                    name += String.fromCharCode(b);
+                    const charCode = view.getUint8(offset + i);
+                    if (charCode > 31 && charCode < 127) name += String.fromCharCode(charCode);
                 }
-
-                const fieldLength = view.getUint8(offset + 16);
-                fields.push({ name: name.trim(), length: fieldLength });
+                fields.push({ name: name.trim(), length: view.getUint8(offset + 16) });
                 offset += 32;
             }
-
-            // --- Parse records ---
+            
             const records = [];
-
+            offset = headerLength;
+            const decoder = new TextDecoder('windows-1252'); 
+            
             for (let i = 0; i < numRecords; i++) {
-                const recStart = headerLength + i * recordLength;
-
-                // Guard against reading past end of buffer
-                if (recStart + recordLength > arrayBuffer.byteLength) break;
-
-                // Deletion flag: 0x20 = active, 0x2A = deleted — skip deleted
-                const deletionFlag = view.getUint8(recStart);
-                if (deletionFlag === 0x2A) continue;
-
-                const record       = {};
-                let   fieldOffset  = recStart + 1;   // +1 skips deletion flag
-
-                for (const field of fields) {
-                    const bytes      = new Uint8Array(arrayBuffer, fieldOffset, field.length);
-                    record[field.name] = decoder.decode(bytes).replace(/\0/g, '').trim();
-                    fieldOffset       += field.length;
+                const record = {};
+                let recordOffset = offset + 1; 
+                for (let j = 0; j < fields.length; j++) {
+                    const field = fields[j];
+                    const fieldData = new Uint8Array(arrayBuffer, recordOffset, field.length);
+                    record[field.name] = decoder.decode(fieldData).replace(/\0/g, '').trim();
+                    recordOffset += field.length;
                 }
-
                 records.push(record);
+                offset += recordLength;
             }
-
             buildRecipeData(records);
         }
 
-        // ============================================================
-        // TEXT FILE PARSER — unchanged from original
-        // ============================================================
         function processTextFile(arrayBuffer) {
             const decoder = new TextDecoder('windows-1252');
-            const lines   = decoder.decode(arrayBuffer).split('\n');
+            const lines = decoder.decode(arrayBuffer).split('\n');
             const records = [];
-
             lines.forEach(line => {
                 const trimmed = line.trim();
                 if (!trimmed) return;
-                const parts = trimmed.split(/\s{2,}/);
+                const parts = trimmed.split(/\s{2,}/); 
                 if (parts.length >= 2) {
-                    records.push({ TAG: parts[0], VAL: parts[1], COM: parts.length > 2 ? parts.slice(2).join(' ') : '' });
+                    records.push({ TAG: parts[0], VAL: parts[1], COM: parts.length > 2 ? parts.slice(2).join(' ') : "" });
                 }
             });
-
             buildRecipeData(records);
         }
 
-        // ============================================================
-        // RECIPE DATA BUILDER — builds recipeData + tagIndex
-        // ============================================================
         function buildRecipeData(records) {
             recipeData = {};
-            tagIndex   = {};
-
-            let currentSection = 'GENERAL INFO';
+            let currentSection = "GENERAL INFO";
             recipeData[currentSection] = [];
 
             records.forEach(rec => {
-                const keys   = Object.keys(rec);
-                const tagKey = keys.find(k => k.toUpperCase().includes('TAG') || k.toUpperCase().includes('NOM')) || keys[0];
-                const valKey = keys.find(k => k.toUpperCase().includes('VAL')) || keys[1];
-                const comKey = keys.find(k => k.toUpperCase().includes('COM')) || keys[keys.length - 1];
+                let keys = Object.keys(rec);
+                let tagKey = keys.find(k => k.toUpperCase().includes('TAG') || k.toUpperCase().includes('NOM')) || keys[0];
+                let valKey = keys.find(k => k.toUpperCase().includes('VAL')) || keys[1];
+                let comKey = keys.find(k => k.toUpperCase().includes('COM')) || keys[keys.length - 1];
 
-                let tag  = rec[tagKey] || '';
-                let val  = rec[valKey] || '';
-                let desc = rec[comKey] || '';
+                let tag = rec[tagKey] || "";
+                let val = rec[valKey] || "";
+                let desc = rec[comKey] || "";
 
-                if (val.includes('@(') && !desc) { desc = val; val = ''; }
+                if (val.includes('@(') && !desc) { desc = val; val = ""; }
                 if (!tag && !val && !desc) return;
 
-                // Section header detection
                 if (tag.includes('--') || desc.includes('--')) {
-                    const match = (tag + ' ' + desc).match(/-{3,}([A-Za-z0-9_ ]+?)-{3,}/);
+                    const match = (tag + " " + desc).match(/-{3,}([A-Za-z0-9_ ]+?)-{3,}/);
                     if (match) {
                         currentSection = match[1].trim();
                         if (!recipeData[currentSection]) recipeData[currentSection] = [];
@@ -631,40 +554,26 @@
 
                 if (tag && !tag.startsWith('--')) {
                     desc = desc.replace(/^X/, '').replace(/@\((.*?)\)/g, '$1');
-                    const entry = { tag, value: val, desc };
-                    recipeData[currentSection].push(entry);
-
-                    // Build O(1) index — first occurrence wins
-                    const cleanedTag = cleanStr(tag);
-                    if (!(cleanedTag in tagIndex)) {
-                        tagIndex[cleanedTag] = val;
-                    }
+                    recipeData[currentSection].push({ tag, value: val, desc });
                 }
             });
-
             renderSidebar();
         }
 
-        // ============================================================
-        // SIDEBAR
-        // ============================================================
         function renderSidebar() {
             const sidebar = document.getElementById('sidebar');
             sidebar.innerHTML = '';
             let isFirst = true;
-
             for (const section in recipeData) {
-                if (recipeData[section].length === 0) continue;
-
-                const navItem       = document.createElement('div');
-                navItem.className   = 'nav-item';
-                navItem.innerText   = section;
-                navItem.onclick     = () => {
+                if (recipeData[section].length === 0) continue; 
+                const navItem = document.createElement('div');
+                navItem.className = 'nav-item';
+                navItem.innerText = section;
+                navItem.onclick = () => {
                     currentActiveSection = section;
                     renderSection(section, navItem);
                 };
                 sidebar.appendChild(navItem);
-
                 if (isFirst) {
                     currentActiveSection = section;
                     renderSection(section, navItem);
@@ -673,199 +582,135 @@
             }
         }
 
-        // ============================================================
-        // TAG HELPERS
-        // ============================================================
+        function cleanStr(str) { return str.replace(/[^a-zA-Z0-9_\[\]]/g, '').toLowerCase(); }
 
-        // cleanStr: strips everything except alphanumerics, underscores,
-        // and square brackets, then lowercases.
-        // NOTE: French accented chars (é, è, â …) are stripped here.
-        // If your tags contain accents, extend this regex or use
-        // str.normalize('NFD').replace(/[\u0300-\u036f]/g,'') first.
-        function cleanStr(str) {
-            return str
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '')   // strip combining accents
-                .replace(/[^a-zA-Z0-9_[\]]/g, '')
-                .toLowerCase();
-        }
-
-        // O(1) lookup via pre-built index
         function findTagVal(tag) {
-            const key = cleanStr(tag);
-            return (key in tagIndex) ? tagIndex[key] : '0';
+            const cleanTarget = cleanStr(tag);
+            for (const section in recipeData) {
+                const row = recipeData[section].find(r => cleanStr(r.tag) === cleanTarget);
+                if (row) return row.value.trim();
+            }
+            return "0"; 
         }
 
         function getIcon(val) {
-            return (parseFloat(val.replace(',', '.')) > 0)
-                ? '<span class="check-icon">✔</span>'
-                : '<span class="cross-icon">✘</span>';
+            return (parseFloat(val.replace(',', '.')) > 0) ? '<span class="check-icon">✔</span>' : '<span class="cross-icon">✘</span>';
         }
 
-        // ============================================================
-        // VIEW TOGGLE
-        // ============================================================
         function toggleView() {
             isVisualMode = !isVisualMode;
-            document.getElementById('viewToggleBtn').innerText = isVisualMode
-                ? 'Show Raw Variables'
-                : 'Show Visual HMI';
-
+            document.getElementById('viewToggleBtn').innerText = isVisualMode ? "Show Raw Variables" : "Show Visual HMI";
+            
             if (isVisualMode) {
-                document.getElementById('rawView').style.display  = 'none';
-                document.getElementById('hmiView').style.display  = 'block';
+                document.getElementById('rawView').style.display = 'none';
+                document.getElementById('hmiView').style.display = 'block';
                 renderVisualHMI();
             } else {
-                document.getElementById('rawView').style.display  = 'block';
-                document.getElementById('hmiView').style.display  = 'none';
+                document.getElementById('rawView').style.display = 'block';
+                document.getElementById('hmiView').style.display = 'none';
             }
         }
 
-        // ============================================================
-        // SECTION RENDERING
-        // ============================================================
         function renderSection(section, clickedElement) {
             if (clickedElement) {
                 document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
                 clickedElement.classList.add('active');
             }
-
             document.getElementById('sectionTitle').innerText = section;
             const toggleBtn = document.getElementById('viewToggleBtn');
 
-            // Show visual HMI for FOUR section (and any section whose
-            // name contains FOUR / OVEN / CHAUFFE for localisation)
-            const isOvenSection = /FOUR|OVEN|CHAUFFE/i.test(section);
-
-            if (isOvenSection) {
-                toggleBtn.style.display = 'block';
-                isVisualMode            = true;
-                toggleBtn.innerText     = 'Show Raw Variables';
+            if (section === "FOUR") {
+                toggleBtn.style.display = "block";
+                isVisualMode = true; 
+                toggleBtn.innerText = "Show Raw Variables";
                 document.getElementById('rawView').style.display = 'none';
                 document.getElementById('hmiView').style.display = 'block';
                 renderVisualHMI();
             } else {
-                toggleBtn.style.display = 'none';
-                isVisualMode            = false;
+                toggleBtn.style.display = "none";
+                isVisualMode = false;
                 document.getElementById('rawView').style.display = 'block';
                 document.getElementById('hmiView').style.display = 'none';
-
+                
                 const tbody = document.querySelector('#dataTable tbody');
                 tbody.innerHTML = '';
                 recipeData[section].forEach(row => {
                     const tr = document.createElement('tr');
-                    tr.innerHTML =
-                        `<td class="tag-name">${row.tag}</td>` +
-                        `<td class="value">${row.value}</td>` +
-                        `<td class="description">${row.desc}</td>`;
+                    tr.innerHTML = `<td class="tag-name">${row.tag}</td><td class="value">${row.value}</td><td class="description">${row.desc}</td>`;
                     tbody.appendChild(tr);
                 });
             }
         }
 
-        // ============================================================
-        // VISUAL HMI RENDERER — identical output to original,
-        // but using tagIndex for O(1) lookups and a Set for yellowZones
-        // ============================================================
         function renderVisualHMI() {
-            const generalHeating = parseFloat(findTagVal('PourcentChauffeDemar').replace(',', '.')) || 100;
+            let generalHeating = parseFloat(findTagVal('PourcentChauffeDemar').replace(',', '.')) || 100;
 
-            // --- Heating % Bars ---
             let barsHtml = '';
             for (let z = 9; z >= 1; z--) {
-                const zonePct    = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
-                const overallPct = Math.min(100, Math.round((zonePct * generalHeating) / 100));
-                barsHtml +=
-                    `<div class="bar-row">` +
-                        `<span class="bar-label">${z}</span>` +
-                        `<span class="bar-val">${overallPct}</span>` +
-                        `<div class="bar-track">` +
-                            `<div class="bar-fill" style="width:${overallPct}%;"></div>` +
-                        `</div>` +
-                    `</div>`;
+                let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
+                let overallPct = Math.round((zonePct * generalHeating) / 100);
+                barsHtml += `<div class="bar-row"><span class="bar-label">${z}</span><span class="bar-val">${overallPct}</span><div class="bar-track"><div class="bar-fill" style="width: ${overallPct}%;"></div></div></div>`;
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
 
-            // --- Lamp Grid ---
             let gridHtml = '';
-            const split  = Math.max(1, Math.min(16, penetrationSplit));
-
-            // Background regions
-            gridHtml +=
-                `<div class="bg-penetration" style="grid-row:1/span 10; grid-column:2/span ${split};"></div>`;
-            if (split < 16) {
-                gridHtml +=
-                    `<div class="bg-distribution" style="grid-row:1/span 10; grid-column:${split + 2}/span ${16 - split};"></div>`;
+            
+            // DYNAMIC BACKGROUND SPLIT: Ovens 1-X Penetration, X-16 Distribution
+            gridHtml += `<div class="bg-penetration" style="grid-row: 1 / span 10; grid-column: 2 / span ${penetrationSplit};"></div>`;
+            if (penetrationSplit < 16) {
+                gridHtml += `<div class="bg-distribution" style="grid-row: 1 / span 10; grid-column: ${2 + penetrationSplit} / span ${16 - penetrationSplit};"></div>`;
             }
 
-            // Oven number headers (row 1)
-            gridHtml += `<div style="grid-row:1; grid-column:1;"></div>`;
-            for (let o = 1; o <= 16; o++) {
-                gridHtml +=
-                    `<div class="col-header" ` +
-                        `style="grid-row:1; grid-column:${o + 1};" ` +
-                        `onclick="setPenetrationSplit(${o})" ` +
-                        `title="Set penetration split at oven ${o}">${o}</div>`;
+            // Row 1: Oven Headers (Clickable)
+            gridHtml += `<div style="grid-row: 1; grid-column: 1;"></div>`; 
+            for(let o = 1; o <= 16; o++) {
+                gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: ${o + 1};" onclick="setPenetrationSplit(${o})" title="Set Penetration Split at Oven ${o}">${o}</div>`;
             }
-            gridHtml += `<div class="col-header" style="grid-row:1; grid-column:18;">%</div>`;
+            gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: 18;">%</div>`;
 
-            // Zone rows (rows 2–10)
+            // Rows 2-10: Lamps explicitly placed
             let rowIndex = 2;
             for (let z = 9; z >= 1; z--) {
-                const zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
+                // Clickable Zone labels
+                gridHtml += `<div class="grid-row-label" style="grid-row: ${rowIndex}; grid-column: 1;" onclick="toggleZoneColor(${z})" title="Toggle 3000W/2500W for Zone ${z}">${z}</div>`;
+                
+                let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
 
-                gridHtml +=
-                    `<div class="grid-row-label" ` +
-                        `style="grid-row:${rowIndex}; grid-column:1;" ` +
-                        `onclick="toggleZoneColor(${z})" ` +
-                        `title="Toggle 3000W/2500W for Zone ${z}">${z}</div>`;
+                for(let o = 1; o <= 16; o++) {
+                    // 1. Bitmask Decoding: Is the lamp ON?
+                    let ovenValStr = findTagVal(`RetourEtatLampeFour${o}`);
+                    let ovenBitmask = parseInt(ovenValStr, 10) || 0;
+                    let isLampOn = (ovenBitmask & (1 << (z - 1))) !== 0;
 
-                for (let o = 1; o <= 16; o++) {
-                    // Bitmask decode: is this lamp active in the recipe?
-                    const ovenValStr  = findTagVal(`RetourEtatLampeFour${o}`);
-                    const ovenBitmask = parseInt(ovenValStr, 10) || 0;
-                    // If tag absent (returns '0') treat ALL lamps as ON —
-                    // recipe files define which lamps are assigned, not runtime state.
-                    const tagAbsent   = (ovenValStr === '0' || ovenValStr === '');
-                    const isLampOn    = tagAbsent || ((ovenBitmask & (1 << (z - 1))) !== 0);
-
-                    const isPenetration   = (o <= split);
-                    const isYellowZone    = yellowZones.has(z);
-                    const wattageClass    = (isPenetration && isYellowZone) ? 'yellow' : 'orange';
-                    const stateClass      = isLampOn ? wattageClass : 'off';
-
-                    gridHtml +=
-                        `<div class="lamp ${stateClass}" ` +
-                            `style="grid-row:${rowIndex}; grid-column:${o + 1};">` +
-                        `</div>`;
+                    // 2. The Golden Rule: 3000W is ONLY allowed in the Penetration Side
+                    let isPenetration = (o <= penetrationSplit);
+                    let isYellowZone = yellowZones.includes(z);
+                    
+                    let wattageColorClass = (isPenetration && isYellowZone) ? 'yellow' : 'orange';
+                    let stateClass = isLampOn ? wattageColorClass : 'off';
+                    
+                    gridHtml += `<div class="lamp ${stateClass}" style="grid-row: ${rowIndex}; grid-column: ${o + 1};"></div>`;
                 }
-
-                gridHtml +=
-                    `<div class="grid-row-pct" ` +
-                        `style="grid-row:${rowIndex}; grid-column:18;">${zonePct}</div>`;
+                gridHtml += `<div class="grid-row-pct" style="grid-row: ${rowIndex}; grid-column: 18;">${zonePct}</div>`;
                 rowIndex++;
             }
-
             document.getElementById('hmiLampGrid').innerHTML = gridHtml;
 
-            // --- Oven panel ---
-            document.getElementById('hmiSpTemp').innerText    = findTagVal('TempConsigne')          + ' °C';
-            document.getElementById('hmiSpVent').innerText    = findTagVal('PourcentVentil')        + ' %';
-            document.getElementById('hmiSpStandby').innerText = findTagVal('PourcentChauffeVeille') + ' %';
-            document.getElementById('hmiCoeff').innerText     = findTagVal('Coeff');
-            document.getElementById('hmiFreq').innerText      = findTagVal('FrequenceRegul');
-            document.getElementById('hmiStartUp').innerText   = findTagVal('PourcentChauffeDemar')  + ' %';
+            // Render Extracted Data Panels
+            document.getElementById('hmiSpTemp').innerText = findTagVal('TempConsigne') + " °C";
+            document.getElementById('hmiSpVent').innerText = findTagVal('PourcentVentil') + " %";
+            document.getElementById('hmiSpStandby').innerText = findTagVal('PourcentChauffeVeille') + " %";
+            document.getElementById('hmiCoeff').innerText = findTagVal('Coeff');
+            document.getElementById('hmiFreq').innerText = findTagVal('FrequenceRegul');
+            document.getElementById('hmiStartUp').innerText = findTagVal('PourcentChauffeDemar') + " %";
 
-            // --- Preform check ---
             document.getElementById('hmiPrefMin').innerText = findTagVal('TempCorpsMini');
             document.getElementById('hmiPrefMax').innerText = findTagVal('TempCorpsMaxi');
 
-            // --- Personalization toggles ---
             document.getElementById('hmiTogBreak').innerHTML = getIcon(findTagVal('ArrMachineBrisLampe'));
-            document.getElementById('hmiTogZ12').innerHTML   = getIcon(findTagVal('Zone1et2EnVeille'));
-            document.getElementById('hmiTogAcc').innerHTML   = getIcon(findTagVal('PrechauffeAccelere'));
-
-            // --- Sync angles ---
+            document.getElementById('hmiTogZ12').innerHTML = getIcon(findTagVal('Zone1et2EnVeille'));
+            document.getElementById('hmiTogAcc').innerHTML = getIcon(findTagVal('PrechauffeAccelere'));
+            
             document.getElementById('hmiSyncOp').innerText = findTagVal('OuvertureChargement');
             document.getElementById('hmiSyncCl').innerText = findTagVal('FermetureChargement');
         }
