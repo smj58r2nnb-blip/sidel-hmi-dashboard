@@ -175,7 +175,7 @@
             color: #3f688e;
             margin-top: 8px;
             margin-bottom: -5px;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
 
         .panel-body {
@@ -239,9 +239,22 @@
             color: #1a3450;
             padding-bottom: 5px;
             z-index: 1;
+            cursor: pointer;
+            transition: color 0.2s;
         }
+        .col-header:hover { color: #ff9d00; }
 
-        .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; z-index: 1; }
+        .grid-row-label { 
+            font-weight: bold; 
+            font-size: 0.9rem; 
+            text-align: right; 
+            padding-right: 10px; 
+            z-index: 1; 
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .grid-row-label:hover { color: #ff9d00; }
+
         .grid-row-pct { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; z-index: 1; }
         
         .lamp {
@@ -349,7 +362,10 @@
 
                         <div class="hmi-panel lamp-panel">
                             <div class="hmi-panel-header">LAMP SET-UP (OVENS)</div>
-                            <div class="hmi-sub-header">PENETRATION OVENS / DISTRIBUTION OVENS</div>
+                            <div class="hmi-sub-header">
+                                PENETRATION / DISTRIBUTION<br>
+                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Click Oven # to set split. Click Zone # to set 3000W rows.)</span>
+                            </div>
                             <div class="panel-body" style="padding-top: 5px;">
                                 <div class="grid-container" id="hmiLampGrid"></div>
                             </div>
@@ -409,6 +425,26 @@
     </div>
 
     <script>
+        // INTERACTIVE STATE MANAGEMENT
+        let yellowZones = JSON.parse(localStorage.getItem('sidelYellowZones')) || [4, 5, 6, 7, 8, 9];
+        let penetrationSplit = parseInt(localStorage.getItem('sidelPenetrationSplit'), 10) || 8;
+
+        function toggleZoneColor(zoneNumber) {
+            if (yellowZones.includes(zoneNumber)) {
+                yellowZones = yellowZones.filter(val => val !== zoneNumber);
+            } else {
+                yellowZones.push(zoneNumber);
+            }
+            localStorage.setItem('sidelYellowZones', JSON.stringify(yellowZones));
+            renderVisualHMI();
+        }
+
+        function setPenetrationSplit(ovenNumber) {
+            penetrationSplit = ovenNumber;
+            localStorage.setItem('sidelPenetrationSplit', penetrationSplit);
+            renderVisualHMI();
+        }
+
         let recipeData = {};
         let currentActiveSection = "";
         let isVisualMode = false;
@@ -619,21 +655,25 @@
 
             let gridHtml = '';
             
-            // BULLETPROOF GRID: Explicit coordinates so the backgrounds don't break the layout
-            gridHtml += `<div class="bg-penetration" style="grid-row: 1 / span 10; grid-column: 2 / span 8;"></div>`;
-            gridHtml += `<div class="bg-distribution" style="grid-row: 1 / span 10; grid-column: 10 / span 8;"></div>`;
+            // DYNAMIC BACKGROUND SPLIT: Ovens 1-X Penetration, X-16 Distribution
+            gridHtml += `<div class="bg-penetration" style="grid-row: 1 / span 10; grid-column: 2 / span ${penetrationSplit};"></div>`;
+            if (penetrationSplit < 16) {
+                gridHtml += `<div class="bg-distribution" style="grid-row: 1 / span 10; grid-column: ${2 + penetrationSplit} / span ${16 - penetrationSplit};"></div>`;
+            }
 
-            // Row 1: Oven Headers explicitly placed
+            // Row 1: Oven Headers (Clickable)
             gridHtml += `<div style="grid-row: 1; grid-column: 1;"></div>`; 
             for(let o = 1; o <= 16; o++) {
-                gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: ${o + 1};">${o}</div>`;
+                gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: ${o + 1};" onclick="setPenetrationSplit(${o})" title="Set Penetration Split at Oven ${o}">${o}</div>`;
             }
             gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: 18;">%</div>`;
 
             // Rows 2-10: Lamps explicitly placed
             let rowIndex = 2;
             for (let z = 9; z >= 1; z--) {
-                gridHtml += `<div class="grid-row-label" style="grid-row: ${rowIndex}; grid-column: 1;">${z}</div>`;
+                // Clickable Zone labels
+                gridHtml += `<div class="grid-row-label" style="grid-row: ${rowIndex}; grid-column: 1;" onclick="toggleZoneColor(${z})" title="Toggle 3000W/2500W for Zone ${z}">${z}</div>`;
+                
                 let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
 
                 for(let o = 1; o <= 16; o++) {
@@ -642,22 +682,11 @@
                     let ovenBitmask = parseInt(ovenValStr, 10) || 0;
                     let isLampOn = (ovenBitmask & (1 << (z - 1))) !== 0;
 
-                    // 2. Hardware Decoding: What Wattage is the bulb?
-                    let powerRatingStr = findTagVal(`PositionLampe${z + 1}[${o - 1}]`);
-                    let powerVal = parseFloat(powerRatingStr.replace(',', '.')) || 0;
-
-                    let wattageColorClass = 'orange'; // Default to 2500W
-                    if (powerVal === 3000) {
-                        wattageColorClass = 'yellow';
-                    } else if (powerVal === 2500) {
-                        wattageColorClass = 'orange';
-                    } else if (powerVal > 0 && z >= 4) {
-                        wattageColorClass = 'yellow'; // Fallback if machine just returns "1"
-                    }
-
-                    // Double-check safety: if PositionLampe is 0, the lamp is mechanically missing
-                    if (powerVal === 0) isLampOn = false;
-
+                    // 2. The Golden Rule: 3000W is ONLY allowed in the Penetration Side
+                    let isPenetration = (o <= penetrationSplit);
+                    let isYellowZone = yellowZones.includes(z);
+                    
+                    let wattageColorClass = (isPenetration && isYellowZone) ? 'yellow' : 'orange';
                     let stateClass = isLampOn ? wattageColorClass : 'off';
                     
                     gridHtml += `<div class="lamp ${stateClass}" style="grid-row: ${rowIndex}; grid-column: ${o + 1};"></div>`;
