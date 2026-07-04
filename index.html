@@ -1,668 +1,631 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidel HMI </title>
-    <style>
-        :root {
-            --bg-main: #2b3e50;
-            --panel-bg: #4fb2e8;
-            --panel-inner: #d4e8f9;
-            --header-bg: linear-gradient(to bottom, #4a77a8, #2b4f76);
-            --text-dark: #1a3450;
-            --border: #2a6f9e;
-            --accent-orange: #ff9d00;
-            --lamp-off: #ffffff;
-            --btn-blue: #5d92c8;
-        }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidel HMI Pro</title>
+    <style>
+        :root {
+            --bg-main: #2b3e50;
+            --panel-bg: #4fb2e8;
+            --panel-inner: #d4e8f9;
+            --header-bg: linear-gradient(to bottom, #4a77a8, #2b4f76);
+            --text-dark: #1a3450;
+            --border: #2a6f9e;
+            --accent-orange: #ff9d00;
+            --lamp-off: #ffffff;
+            --btn-blue: #5d92c8;
+        }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-main);
-            color: var(--text-dark);
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-        header {
-            background: var(--header-bg);
-            color: white;
-            padding: 10px 20px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #1a3450;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            z-index: 10;
-        }
+        header {
+            background: var(--header-bg);
+            color: white;
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #1a3450;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
 
-        .upload-area {
-            background-color: #fff;
-            padding: 10px 20px;
-            border-bottom: 1px solid #9fb2c0;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
+        .upload-area {
+            background-color: #fff;
+            padding: 10px 20px;
+            border-bottom: 1px solid #9fb2c0;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
 
-        input[type="file"] {
-            border: 1px solid #ccc;
-            padding: 5px;
-            border-radius: 4px;
-        }
+        input[type="file"] {
+            border: 1px solid #ccc;
+            padding: 5px;
+            border-radius: 4px;
+        }
 
-        .dashboard {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
+        .dashboard {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
 
-        .sidebar {
-            width: 220px;
-            background-color: #fff;
-            border-right: 1px solid #9fb2c0;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-        }
+        .sidebar {
+            width: 220px;
+            background-color: #fff;
+            border-right: 1px solid #9fb2c0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
 
-        .nav-item {
-            padding: 12px 15px;
-            cursor: pointer;
-            border-bottom: 1px solid #eee;
-            font-size: 0.9rem;
-            color: #555;
-            font-weight: bold;
-        }
+        .nav-item {
+            padding: 12px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
+            color: #555;
+            font-weight: bold;
+        }
 
-        .nav-item:hover { background-color: #f0f5fa; }
-        .nav-item.active {
-            background: var(--header-bg);
-            color: white;
-        }
+        .nav-item:hover { background-color: #f0f5fa; }
+        .nav-item.active {
+            background: var(--header-bg);
+            color: white;
+        }
 
-        .main-content {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            position: relative;
-        }
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            position: relative;
+        }
 
-        .view-toggle {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background-color: var(--btn-blue);
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-            z-index: 10;
-        }
+        .view-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: var(--btn-blue);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
 
-        .view-toggle:hover { background-color: #4a77a8; }
+        .view-toggle:hover { background-color: #4a77a8; }
 
-        .empty-state {
-            text-align: center;
-            color: #a3c4e0;
-            font-size: 1.5rem;
-            margin-top: 100px;
-            font-weight: bold;
-        }
+        .empty-state {
+            text-align: center;
+            color: #a3c4e0;
+            font-size: 1.5rem;
+            margin-top: 100px;
+            font-weight: bold;
+        }
 
-        #rawView {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-        }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
-        th { background-color: #f5f5f5; }
+        #rawView {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
+        th { background-color: #f5f5f5; }
 
-        /* SIDEL HMI VISUAL STYLES */
-        .hmi-layout {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            margin-top: 30px;
-            background-color: var(--panel-bg);
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: inset 2px 2px 10px rgba(255,255,255,0.4), 0 5px 15px rgba(0,0,0,0.4);
-        }
+        /* SIDEL HMI VISUAL STYLES */
+        .hmi-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-top: 30px;
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: inset 2px 2px 10px rgba(255,255,255,0.4), 0 5px 15px rgba(0,0,0,0.4);
+        }
 
-        .hmi-row {
-            display: flex;
-            gap: 20px;
-        }
+        .hmi-row {
+            display: flex;
+            gap: 20px;
+        }
 
-        .hmi-panel {
-            background: var(--panel-inner);
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            box-shadow: inset 1px 1px 3px white, 0 4px 6px rgba(0,0,0,0.15);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            flex: 1;
-        }
+        .hmi-panel {
+            background: var(--panel-inner);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            box-shadow: inset 1px 1px 3px white, 0 4px 6px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex: 1;
+        }
 
-        .hmi-panel-header {
-            background: #ffffff;
-            text-align: center;
-            font-size: 0.95rem;
-            font-weight: bold;
-            color: #1a3450;
-            padding: 8px;
-            border-bottom: 2px solid var(--border);
-            text-transform: uppercase;
-        }
+        .hmi-panel-header {
+            background: #ffffff;
+            text-align: center;
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: #1a3450;
+            padding: 8px;
+            border-bottom: 2px solid var(--border);
+            text-transform: uppercase;
+        }
 
-        .hmi-sub-header {
-            text-align: center;
-            font-size: 0.75rem;
-            font-weight: bold;
-            color: #3f688e;
-            margin-top: 8px;
-            margin-bottom: -5px;
-            letter-spacing: 1px;
-        }
+        .panel-body {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
 
-        .panel-body {
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
+        /* Heating % Bars */
+        .heating-panel { flex: 0.4; }
+        .bars-container { display: flex; flex-direction: column; gap: 8px; }
+        .bar-row { display: flex; align-items: center; font-size: 0.85rem; }
+        .bar-label { width: 20px; font-weight: bold; }
+        .bar-val { width: 45px; text-align: right; margin-right: 10px; font-family: monospace; font-size: 0.9rem;}
+        .bar-track {
+            flex: 1;
+            height: 14px;
+            background-color: #ffffff;
+            border: 1px solid #777;
+            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.2);
+        }
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(to bottom, #ffcca6, #ff9d00);
+            border-right: 1px solid #c77b00;
+        }
 
-        /* Heating % Bars */
-        .heating-panel { flex: 0.4; }
-        .bars-container { display: flex; flex-direction: column; gap: 8px; }
-        .bar-row { display: flex; align-items: center; font-size: 0.85rem; }
-        .bar-label { width: 20px; font-weight: bold; }
-        .bar-val { width: 45px; text-align: right; margin-right: 10px; font-family: monospace; font-size: 0.9rem;}
-        .bar-track {
-            flex: 1;
-            height: 14px;
-            background-color: #ffffff;
-            border: 1px solid #777;
-            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.2);
-        }
-        .bar-fill {
-            height: 100%;
-            background: linear-gradient(to bottom, #ffcca6, #ff9d00);
-            border-right: 1px solid #c77b00;
-        }
+        /* Lamp Grid */
+        .lamp-panel { flex: 0.6; }
+        .grid-container {
+            display: grid;
+            grid-template-columns: 30px repeat(16, 1fr) 45px;
+            gap: 5px;
+            align-items: center;
+        }
+        .oven-numbers {
+            display: grid;
+            grid-template-columns: 30px repeat(16, 1fr) 45px;
+            gap: 5px;
+            font-size: 0.8rem;
+            text-align: center;
+            font-weight: bold;
+            color: #1a3450;
+            margin-bottom: 5px;
+        }
+        .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; }
+        .grid-row-pct { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; }
+        .lamp {
+            height: 12px;
+            border: 1px solid #555;
+            border-radius: 2px;
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        .lamp.on { 
+            background-color: var(--accent-orange); 
+            border-color: #c77b00;
+        }
+        .lamp.off { background-color: var(--lamp-off); }
 
-        /* Lamp Grid */
-        .lamp-panel { flex: 0.6; }
-        
-        .grid-container {
-            display: grid;
-            grid-template-columns: 30px repeat(16, 1fr) 45px;
-            gap: 5px;
-            padding: 10px 15px 15px 15px;
-            align-items: center;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .bg-penetration {
-            grid-row: 1 / span 10;
-            background-color: #6a95c2;
-            margin: -5px -2.5px;
-            z-index: -1;
-            border-radius: 4px 0 0 4px;
-            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1);
-        }
+        /* Small Data Boxes (Setpoints, Checks) */
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .data-box {
+            background-color: #ffffff;
+            border: 1px solid #aebfd0;
+            padding: 5px 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 1.1rem;
+            color: #1a3450;
+            text-align: center;
+            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1);
+            min-width: 60px;
+        }
+        .check-icon { color: green; font-weight: bold; font-size: 1.2rem; }
+        .cross-icon { color: red; font-weight: bold; font-size: 1.2rem; }
+        hr { border: 0; border-top: 1px solid #b0c0d0; width: 100%; margin: 5px 0; }
 
-        .bg-distribution {
-            grid-row: 1 / span 10;
-            background-color: #8eb5db;
-            margin: -5px -2.5px;
-            z-index: -1;
-            border-radius: 0 4px 4px 0;
-            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .col-header {
-            font-size: 0.8rem;
-            text-align: center;
-            font-weight: bold;
-            color: #1a3450;
-            padding-bottom: 5px;
-        }
-
-        .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; }
-        .grid-row-pct { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; }
-        
-        .lamp {
-            height: 12px;
-            border: 1px solid #555;
-            border-radius: 2px;
-            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
-        }
-        .lamp.on { 
-            background-color: var(--accent-orange); 
-            border-color: #c77b00;
-        }
-        .lamp.off { background-color: var(--lamp-off); }
-
-        /* Small Data Boxes (Setpoints, Checks) */
-        .data-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-        .data-box {
-            background-color: #ffffff;
-            border: 1px solid #aebfd0;
-            padding: 5px 15px;
-            border-radius: 6px;
-            font-family: monospace;
-            font-size: 1.1rem;
-            color: #1a3450;
-            text-align: center;
-            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1);
-            min-width: 60px;
-        }
-        .check-icon { color: green; font-weight: bold; font-size: 1.2rem; }
-        .cross-icon { color: red; font-weight: bold; font-size: 1.2rem; }
-        hr { border: 0; border-top: 1px solid #b0c0d0; width: 100%; margin: 5px 0; }
-
-    </style>
-    <!-- Google Translate Script -->
-    <script type="text/javascript">
-        function googleTranslateElementInit() {
-            new google.translate.TranslateElement({pageLanguage: 'fr', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
-        }
-    </script>
-    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+    </style>
+    <!-- Google Translate Script -->
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({pageLanguage: 'fr', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </head>
 <body>
 
-    <header>
-        <div style="display:flex; align-items:center; gap: 20px;">
-            <div>SIDEL HMI PRO</div>
-            <div id="recipeName" style="font-size: 0.9rem; font-weight: normal; color: #a3c4e0;">No file loaded</div>
-        </div>
-        <div id="google_translate_element"></div>
-    </header>
+    <header>
+        <div style="display:flex; align-items:center; gap: 20px;">
+            <div>SIDEL HMI PRO</div>
+            <div id="recipeName" style="font-size: 0.9rem; font-weight: normal; color: #a3c4e0;">No file loaded</div>
+        </div>
+        <div id="google_translate_element"></div>
+    </header>
 
-    <div class="upload-area">
-        <input type="file" id="fileInput" accept=".dbf,.txt,*/*" onchange="loadFile()" />
-        <span style="font-size: 0.85rem; color: #666;">(File is processed 100% locally in your browser)</span>
-    </div>
+    <div class="upload-area">
+        <input type="file" id="fileInput" accept=".dbf,.txt,*/*" onchange="loadFile()" />
+        <span style="font-size: 0.85rem; color: #666;">(File is processed 100% locally in your browser)</span>
+    </div>
 
-    <div class="dashboard">
-        <div class="sidebar" id="sidebar"></div>
-        <div class="main-content" id="mainContent">
-            
-            <div id="emptyState" class="empty-state">
-                Please upload a Sidel recipe file to view the HMI Dashboard.
-            </div>
+    <div class="dashboard">
+        <div class="sidebar" id="sidebar"></div>
+        <div class="main-content" id="mainContent">
+            
+            <div id="emptyState" class="empty-state">
+                Please upload a Sidel recipe file to view the HMI Dashboard.
+            </div>
 
-            <button id="viewToggleBtn" class="view-toggle" style="display:none;" onclick="toggleView()">Show Raw Variables</button>
+            <button id="viewToggleBtn" class="view-toggle" style="display:none;" onclick="toggleView()">Show Raw Variables</button>
 
-            <div id="rawView" style="display: none;">
-                <h2 id="sectionTitle" style="margin-top:0;">Section</h2>
-                <table id="dataTable">
-                    <thead>
-                        <tr>
-                            <th width="35%">Tag</th>
-                            <th width="20%">Value</th>
-                            <th width="45%">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+            <div id="rawView" style="display: none;">
+                <h2 id="sectionTitle" style="margin-top:0;">Section</h2>
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th width="35%">Tag</th>
+                            <th width="20%">Value</th>
+                            <th width="45%">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
 
-            <!-- SIDEL HMI VISUALIZATION (Initially Hidden) -->
-            <div id="hmiView" style="display: none;">
-                <div class="hmi-layout">
-                    
-                    <!-- Row 1: Heating % and Lamps -->
-                    <div class="hmi-row">
-                        <div class="hmi-panel heating-panel">
-                            <div class="hmi-panel-header">Overall Heating %</div>
-                            <div class="panel-body bars-container" id="hmiBars"></div>
-                        </div>
+            <!-- SIDEL HMI VISUALIZATION (Initially Hidden) -->
+            <div id="hmiView" style="display: none;">
+                <div class="hmi-layout">
+                    
+                    <!-- Row 1: Heating % and Lamps -->
+                    <div class="hmi-row">
+                        <div class="hmi-panel heating-panel">
+                            <div class="hmi-panel-header">Overall Heating %</div>
+                            <div class="panel-body bars-container" id="hmiBars"></div>
+                        </div>
 
-                        <div class="hmi-panel lamp-panel">
-                            <div class="hmi-panel-header">LAMP SET-UP (OVENS)</div>
-                            <div class="hmi-sub-header">PENETRATION OVENS / DISTRIBUTION OVENS</div>
-                            <div class="panel-body" style="padding-top: 5px;">
-                                <div class="grid-container" id="hmiLampGrid"></div>
-                            </div>
-                        </div>
-                    </div>
+                        <div class="hmi-panel lamp-panel">
+                            <div class="hmi-panel-header">Lamp Set-Up (Ovens)</div>
+                            <div class="panel-body">
+                                <div class="oven-numbers" id="hmiOvenLabels"></div>
+                                <div class="grid-container" id="hmiLampGrid"></div>
+                            </div>
+                        </div>
+                    </div>
 
-                    <!-- Row 2: Setpoints and Personalization -->
-                    <div class="hmi-row">
-                        <div class="hmi-panel">
-                            <div class="hmi-panel-header">Oven</div>
-                            <div class="panel-body">
-                                <div class="data-row"><span>Temp Setpoint</span> <div class="data-box" id="hmiSpTemp">-- °C</div></div>
-                                <div class="data-row"><span>Ventilation</span> <div class="data-box" id="hmiSpVent">-- %</div></div>
-                                <div class="data-row"><span>Standby</span> <div class="data-box" id="hmiSpStandby">-- %</div></div>
-                                <hr>
-                                <div class="data-row"><span>Correction Coefficient</span> <span id="hmiCoeff">--</span></div>
-                                <div class="data-row"><span>Correction Frequency</span> <span id="hmiFreq">--</span></div>
-                                <hr>
-                                <div class="data-row"><span>Production Start Up</span> <span id="hmiStartUp">-- %</span></div>
-                            </div>
-                        </div>
+                    <!-- Row 2: Setpoints and Personalization -->
+                    <div class="hmi-row">
+                        <div class="hmi-panel">
+                            <div class="hmi-panel-header">Oven</div>
+                            <div class="panel-body">
+                                <div class="data-row"><span>Temp Setpoint</span> <div class="data-box" id="hmiSpTemp">-- °C</div></div>
+                                <div class="data-row"><span>Ventilation</span> <div class="data-box" id="hmiSpVent">-- %</div></div>
+                                <div class="data-row"><span>Standby</span> <div class="data-box" id="hmiSpStandby">-- %</div></div>
+                                <hr>
+                                <div class="data-row"><span>Correction Coefficient</span> <span id="hmiCoeff">--</span></div>
+                                <div class="data-row"><span>Correction Frequency</span> <span id="hmiFreq">--</span></div>
+                                <hr>
+                                <div class="data-row"><span>Production Start Up</span> <span id="hmiStartUp">-- %</span></div>
+                            </div>
+                        </div>
 
-                        <div class="hmi-panel">
-                            <div class="hmi-panel-header">Preform Check</div>
-                            <div class="panel-body" style="justify-content: center; align-items: center; height: 100%;">
-                                <div style="display: flex; gap: 30px; text-align: center;">
-                                    <div>
-                                        <div style="font-weight: bold; margin-bottom: 5px;">Min °C</div>
-                                        <div class="data-box" id="hmiPrefMin">--</div>
-                                    </div>
-                                    <div>
-                                        <div style="font-weight: bold; margin-bottom: 5px;">Max °C</div>
-                                        <div class="data-box" id="hmiPrefMax">--</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <div class="hmi-panel">
+                            <div class="hmi-panel-header">Preform Check</div>
+                            <div class="panel-body" style="justify-content: center; align-items: center; height: 100%;">
+                                <div style="display: flex; gap: 30px; text-align: center;">
+                                    <div>
+                                        <div style="font-weight: bold; margin-bottom: 5px;">Min °C</div>
+                                        <div class="data-box" id="hmiPrefMin">--</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: bold; margin-bottom: 5px;">Max °C</div>
+                                        <div class="data-box" id="hmiPrefMax">--</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-                        <div class="hmi-panel">
-                            <div class="hmi-panel-header">Oven Personalization</div>
-                            <div class="panel-body">
-                                <div class="data-row"><span>Stop on Lamp Breakage</span> <span id="hmiTogBreak"></span></div>
-                                <div class="data-row"><span>Zones 1&2 on Standby</span> <span id="hmiTogZ12"></span></div>
-                                <div class="data-row"><span>Accelerated Heating</span> <span id="hmiTogAcc"></span></div>
-                                <hr>
-                                <div class="data-row">
-                                    <span>Sync Open</span> <span class="data-box" id="hmiSyncOp">-- %</span>
-                                    <span>Sync Close</span> <span class="data-box" id="hmiSyncCl">-- %</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                        <div class="hmi-panel">
+                            <div class="hmi-panel-header">Oven Personalization</div>
+                            <div class="panel-body">
+                                <div class="data-row"><span>Stop on Lamp Breakage</span> <span id="hmiTogBreak"></span></div>
+                                <div class="data-row"><span>Zones 1&2 on Standby</span> <span id="hmiTogZ12"></span></div>
+                                <div class="data-row"><span>Accelerated Heating</span> <span id="hmiTogAcc"></span></div>
+                                <hr>
+                                <div class="data-row">
+                                    <span>Sync Open</span> <span class="data-box" id="hmiSyncOp">-- %</span>
+                                    <span>Sync Close</span> <span class="data-box" id="hmiSyncCl">-- %</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                </div>
-            </div>
+                </div>
+            </div>
 
-        </div>
-    </div>
+        </div>
+    </div>
 
-    <script>
-        let recipeData = {};
-        let currentActiveSection = "";
-        let isVisualMode = false;
+    <script>
+        let recipeData = {};
+        let currentActiveSection = "";
+        let isVisualMode = false;
 
-        // Change this variable to match how many penetration ovens your machine has
-        const penetrationOvenCount = 8; 
+        function loadFile() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return;
+            document.getElementById('recipeName').innerText = file.name;
+            document.getElementById('emptyState').style.display = 'none';
 
-        function loadFile() {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) return;
-            document.getElementById('recipeName').innerText = file.name;
-            document.getElementById('emptyState').style.display = 'none';
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const buffer = e.target.result;
+                const view = new DataView(buffer);
+                
+                if (buffer.byteLength > 0 && view.getUint8(0) === 0x03) {
+                    try { processBinaryDBF(buffer); } 
+                    catch (err) { processTextFile(buffer); }
+                } else {
+                    processTextFile(buffer);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
 
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const buffer = e.target.result;
-                const view = new DataView(buffer);
-                
-                if (buffer.byteLength > 0 && view.getUint8(0) === 0x03) {
-                    try { processBinaryDBF(buffer); } 
-                    catch (err) { processTextFile(buffer); }
-                } else {
-                    processTextFile(buffer);
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        }
+        function processBinaryDBF(arrayBuffer) {
+            const view = new DataView(arrayBuffer);
+            const numRecords = view.getUint32(4, true);
+            const headerLength = view.getUint16(8, true);
+            const recordLength = view.getUint16(10, true);
+            
+            const fields = [];
+            let offset = 32;
+            
+            while (offset < headerLength - 1) {
+                const firstByte = view.getUint8(offset);
+                if (firstByte === 0x0D) break; 
+                let name = "";
+                for (let i = 0; i < 11; i++) {
+                    const charCode = view.getUint8(offset + i);
+                    if (charCode > 31 && charCode < 127) name += String.fromCharCode(charCode);
+                }
+                fields.push({ name: name.trim(), length: view.getUint8(offset + 16) });
+                offset += 32;
+            }
+            
+            const records = [];
+            offset = headerLength;
+            const decoder = new TextDecoder('windows-1252'); 
+            
+            for (let i = 0; i < numRecords; i++) {
+                const record = {};
+                let recordOffset = offset + 1; 
+                for (let j = 0; j < fields.length; j++) {
+                    const field = fields[j];
+                    const fieldData = new Uint8Array(arrayBuffer, recordOffset, field.length);
+                    record[field.name] = decoder.decode(fieldData).replace(/\0/g, '').trim();
+                    recordOffset += field.length;
+                }
+                records.push(record);
+                offset += recordLength;
+            }
+            buildRecipeData(records);
+        }
 
-        function processBinaryDBF(arrayBuffer) {
-            const view = new DataView(arrayBuffer);
-            const numRecords = view.getUint32(4, true);
-            const headerLength = view.getUint16(8, true);
-            const recordLength = view.getUint16(10, true);
-            
-            const fields = [];
-            let offset = 32;
-            
-            while (offset < headerLength - 1) {
-                const firstByte = view.getUint8(offset);
-                if (firstByte === 0x0D) break; 
-                let name = "";
-                for (let i = 0; i < 11; i++) {
-                    const charCode = view.getUint8(offset + i);
-                    if (charCode > 31 && charCode < 127) name += String.fromCharCode(charCode);
-                }
-                fields.push({ name: name.trim(), length: view.getUint8(offset + 16) });
-                offset += 32;
-            }
-            
-            const records = [];
-            offset = headerLength;
-            const decoder = new TextDecoder('windows-1252'); 
-            
-            for (let i = 0; i < numRecords; i++) {
-                const record = {};
-                let recordOffset = offset + 1; 
-                for (let j = 0; j < fields.length; j++) {
-                    const field = fields[j];
-                    const fieldData = new Uint8Array(arrayBuffer, recordOffset, field.length);
-                    record[field.name] = decoder.decode(fieldData).replace(/\0/g, '').trim();
-                    recordOffset += field.length;
-                }
-                records.push(record);
-                offset += recordLength;
-            }
-            buildRecipeData(records);
-        }
+        function processTextFile(arrayBuffer) {
+            const decoder = new TextDecoder('windows-1252');
+            const lines = decoder.decode(arrayBuffer).split('\n');
+            const records = [];
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+                const parts = trimmed.split(/\s{2,}/); 
+                if (parts.length >= 2) {
+                    records.push({ TAG: parts[0], VAL: parts[1], COM: parts.length > 2 ? parts.slice(2).join(' ') : "" });
+                }
+            });
+            buildRecipeData(records);
+        }
 
-        function processTextFile(arrayBuffer) {
-            const decoder = new TextDecoder('windows-1252');
-            const lines = decoder.decode(arrayBuffer).split('\n');
-            const records = [];
-            lines.forEach(line => {
-                const trimmed = line.trim();
-                if (!trimmed) return;
-                const parts = trimmed.split(/\s{2,}/); 
-                if (parts.length >= 2) {
-                    records.push({ TAG: parts[0], VAL: parts[1], COM: parts.length > 2 ? parts.slice(2).join(' ') : "" });
-                }
-            });
-            buildRecipeData(records);
-        }
+        function buildRecipeData(records) {
+            recipeData = {};
+            let currentSection = "GENERAL INFO";
+            recipeData[currentSection] = [];
 
-        function buildRecipeData(records) {
-            recipeData = {};
-            let currentSection = "GENERAL INFO";
-            recipeData[currentSection] = [];
+            records.forEach(rec => {
+                let keys = Object.keys(rec);
+                let tagKey = keys.find(k => k.toUpperCase().includes('TAG') || k.toUpperCase().includes('NOM')) || keys[0];
+                let valKey = keys.find(k => k.toUpperCase().includes('VAL')) || keys[1];
+                let comKey = keys.find(k => k.toUpperCase().includes('COM')) || keys[keys.length - 1];
 
-            records.forEach(rec => {
-                let keys = Object.keys(rec);
-                let tagKey = keys.find(k => k.toUpperCase().includes('TAG') || k.toUpperCase().includes('NOM')) || keys[0];
-                let valKey = keys.find(k => k.toUpperCase().includes('VAL')) || keys[1];
-                let comKey = keys.find(k => k.toUpperCase().includes('COM')) || keys[keys.length - 1];
+                let tag = rec[tagKey] || "";
+                let val = rec[valKey] || "";
+                let desc = rec[comKey] || "";
 
-                let tag = rec[tagKey] || "";
-                let val = rec[valKey] || "";
-                let desc = rec[comKey] || "";
+                if (val.includes('@(') && !desc) { desc = val; val = ""; }
+                if (!tag && !val && !desc) return;
 
-                if (val.includes('@(') && !desc) { desc = val; val = ""; }
-                if (!tag && !val && !desc) return;
+                if (tag.includes('--') || desc.includes('--')) {
+                    const match = (tag + " " + desc).match(/-{3,}([A-Za-z0-9_ ]+?)-{3,}/);
+                    if (match) {
+                        currentSection = match[1].trim();
+                        if (!recipeData[currentSection]) recipeData[currentSection] = [];
+                        return;
+                    }
+                }
 
-                if (tag.includes('--') || desc.includes('--')) {
-                    const match = (tag + " " + desc).match(/-{3,}([A-Za-z0-9_ ]+?)-{3,}/);
-                    if (match) {
-                        currentSection = match[1].trim();
-                        if (!recipeData[currentSection]) recipeData[currentSection] = [];
-                        return;
-                    }
-                }
+                if (tag && !tag.startsWith('--')) {
+                    desc = desc.replace(/^X/, '').replace(/@\((.*?)\)/g, '$1');
+                    recipeData[currentSection].push({ tag, value: val, desc });
+                }
+            });
+            renderSidebar();
+        }
 
-                if (tag && !tag.startsWith('--')) {
-                    desc = desc.replace(/^X/, '').replace(/@\((.*?)\)/g, '$1');
-                    recipeData[currentSection].push({ tag, value: val, desc });
-                }
-            });
-            renderSidebar();
-        }
+        function renderSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.innerHTML = '';
+            let isFirst = true;
+            for (const section in recipeData) {
+                if (recipeData[section].length === 0) continue; 
+                const navItem = document.createElement('div');
+                navItem.className = 'nav-item';
+                navItem.innerText = section;
+                navItem.onclick = () => {
+                    currentActiveSection = section;
+                    renderSection(section, navItem);
+                };
+                sidebar.appendChild(navItem);
+                if (isFirst) {
+                    currentActiveSection = section;
+                    renderSection(section, navItem);
+                    isFirst = false;
+                }
+            }
+        }
 
-        function renderSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.innerHTML = '';
-            let isFirst = true;
-            for (const section in recipeData) {
-                if (recipeData[section].length === 0) continue; 
-                const navItem = document.createElement('div');
-                navItem.className = 'nav-item';
-                navItem.innerText = section;
-                navItem.onclick = () => {
-                    currentActiveSection = section;
-                    renderSection(section, navItem);
-                };
-                sidebar.appendChild(navItem);
-                if (isFirst) {
-                    currentActiveSection = section;
-                    renderSection(section, navItem);
-                    isFirst = false;
-                }
-            }
-        }
+        function cleanStr(str) { return str.replace(/[^a-zA-Z0-9_\[\]]/g, '').toLowerCase(); }
 
-        function cleanStr(str) { return str.replace(/[^a-zA-Z0-9_\[\]]/g, '').toLowerCase(); }
+        function findTagVal(tag) {
+            const cleanTarget = cleanStr(tag);
+            for (const section in recipeData) {
+                const row = recipeData[section].find(r => cleanStr(r.tag) === cleanTarget);
+                if (row) return row.value.trim();
+            }
+            return "0"; 
+        }
 
-        function findTagVal(tag) {
-            const cleanTarget = cleanStr(tag);
-            for (const section in recipeData) {
-                const row = recipeData[section].find(r => cleanStr(r.tag) === cleanTarget);
-                if (row) return row.value.trim();
-            }
-            return "0"; 
-        }
+        function getIcon(val) {
+            return (parseFloat(val.replace(',', '.')) > 0) ? '<span class="check-icon">✔</span>' : '<span class="cross-icon">✘</span>';
+        }
 
-        function getIcon(val) {
-            return (parseFloat(val.replace(',', '.')) > 0) ? '<span class="check-icon">✔</span>' : '<span class="cross-icon">✘</span>';
-        }
+        function toggleView() {
+            isVisualMode = !isVisualMode;
+            document.getElementById('viewToggleBtn').innerText = isVisualMode ? "Show Raw Variables" : "Show Visual HMI";
+            
+            if (isVisualMode) {
+                document.getElementById('rawView').style.display = 'none';
+                document.getElementById('hmiView').style.display = 'block';
+                renderVisualHMI();
+            } else {
+                document.getElementById('rawView').style.display = 'block';
+                document.getElementById('hmiView').style.display = 'none';
+            }
+        }
 
-        function toggleView() {
-            isVisualMode = !isVisualMode;
-            document.getElementById('viewToggleBtn').innerText = isVisualMode ? "Show Raw Variables" : "Show Visual HMI";
-            
-            if (isVisualMode) {
-                document.getElementById('rawView').style.display = 'none';
-                document.getElementById('hmiView').style.display = 'block';
-                renderVisualHMI();
-            } else {
-                document.getElementById('rawView').style.display = 'block';
-                document.getElementById('hmiView').style.display = 'none';
-            }
-        }
+        function renderSection(section, clickedElement) {
+            if (clickedElement) {
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                clickedElement.classList.add('active');
+            }
+            document.getElementById('sectionTitle').innerText = section;
+            const toggleBtn = document.getElementById('viewToggleBtn');
 
-        function renderSection(section, clickedElement) {
-            if (clickedElement) {
-                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-                clickedElement.classList.add('active');
-            }
-            document.getElementById('sectionTitle').innerText = section;
-            const toggleBtn = document.getElementById('viewToggleBtn');
+            if (section === "FOUR") {
+                toggleBtn.style.display = "block";
+                isVisualMode = true; 
+                toggleBtn.innerText = "Show Raw Variables";
+                document.getElementById('rawView').style.display = 'none';
+                document.getElementById('hmiView').style.display = 'block';
+                renderVisualHMI();
+            } else {
+                toggleBtn.style.display = "none";
+                isVisualMode = false;
+                document.getElementById('rawView').style.display = 'block';
+                document.getElementById('hmiView').style.display = 'none';
+                
+                const tbody = document.querySelector('#dataTable tbody');
+                tbody.innerHTML = '';
+                recipeData[section].forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td class="tag-name">${row.tag}</td><td class="value">${row.value}</td><td class="description">${row.desc}</td>`;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
 
-            if (section === "FOUR") {
-                toggleBtn.style.display = "block";
-                isVisualMode = true; 
-                toggleBtn.innerText = "Show Raw Variables";
-                document.getElementById('rawView').style.display = 'none';
-                document.getElementById('hmiView').style.display = 'block';
-                renderVisualHMI();
-            } else {
-                toggleBtn.style.display = "none";
-                isVisualMode = false;
-                document.getElementById('rawView').style.display = 'block';
-                document.getElementById('hmiView').style.display = 'none';
-                
-                const tbody = document.querySelector('#dataTable tbody');
-                tbody.innerHTML = '';
-                recipeData[section].forEach(row => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `<td class="tag-name">${row.tag}</td><td class="value">${row.value}</td><td class="description">${row.desc}</td>`;
-                    tbody.appendChild(tr);
-                });
-            }
-        }
+        function renderVisualHMI() {
+            let generalHeating = parseFloat(findTagVal('PourcentChauffeDemar').replace(',', '.')) || 100;
 
-        function renderVisualHMI() {
-            let generalHeating = parseFloat(findTagVal('PourcentChauffeDemar').replace(',', '.')) || 100;
+            // Render Heating Bars with Math.round() for exact display matching
+            let barsHtml = '';
+            for (let z = 9; z >= 1; z--) {
+                let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
+                let overallPct = Math.round((zonePct * generalHeating) / 100);
+                barsHtml += `<div class="bar-row"><span class="bar-label">${z}</span><span class="bar-val">${overallPct}</span><div class="bar-track"><div class="bar-fill" style="width: ${overallPct}%;"></div></div></div>`;
+            }
+            document.getElementById('hmiBars').innerHTML = barsHtml;
 
-            let barsHtml = '';
-            for (let z = 9; z >= 1; z--) {
-                let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
-                let overallPct = Math.round((zonePct * generalHeating) / 100);
-                barsHtml += `<div class="bar-row"><span class="bar-label">${z}</span><span class="bar-val">${overallPct}</span><div class="bar-track"><div class="bar-fill" style="width: ${overallPct}%;"></div></div></div>`;
-            }
-            document.getElementById('hmiBars').innerHTML = barsHtml;
+            // Render Lamp Grid
+            let ovenHeaders = '<div></div>'; 
+            for(let o = 1; o <= 16; o++) ovenHeaders += `<div>${o}</div>`;
+            ovenHeaders += '<div>%</div>';
+            document.getElementById('hmiOvenLabels').innerHTML = ovenHeaders;
 
-            let gridHtml = '';
-            
-            // Add the background blocks to create the two-tone blue split
-            gridHtml += `<div class="bg-penetration" style="grid-column: 2 / span ${penetrationOvenCount};"></div>`;
-            gridHtml += `<div class="bg-distribution" style="grid-column: ${2 + penetrationOvenCount} / span ${16 - penetrationOvenCount};"></div>`;
+            let gridHtml = '';
+            for (let z = 9; z >= 1; z--) {
+                gridHtml += `<div class="grid-row-label">${z}</div>`;
+                let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
 
-            // Row 1: Oven Headers
-            gridHtml += `<div></div>`; 
-            for(let o = 1; o <= 16; o++) gridHtml += `<div class="col-header">${o}</div>`;
-            gridHtml += `<div class="col-header">%</div>`;
+                for(let o = 1; o <= 16; o++) {
+                    // Pull the integer bitmask for the entire oven column
+                    let ovenValStr = findTagVal(`RetourEtatLampeFour${o}`);
+                    let ovenBitmask = parseInt(ovenValStr, 10) || 0;
+                    
+                    // Decode the bitmask: Check if the specific zone's bit is turned on (1)
+                    let isLampOn = (ovenBitmask & (1 << (z - 1))) !== 0;
+                    let stateClass = isLampOn ? 'on' : 'off';
+                    
+                    gridHtml += `<div class="lamp ${stateClass}"></div>`;
+                }
+                gridHtml += `<div class="grid-row-pct">${zonePct}</div>`;
+            }
+            document.getElementById('hmiLampGrid').innerHTML = gridHtml;
 
-            // Rows 2-10: Lamps
-            for (let z = 9; z >= 1; z--) {
-                gridHtml += `<div class="grid-row-label">${z}</div>`;
-                let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
+            // Render Extracted Data Panels
+            document.getElementById('hmiSpTemp').innerText = findTagVal('TempConsigne') + " °C";
+            document.getElementById('hmiSpVent').innerText = findTagVal('PourcentVentil') + " %";
+            document.getElementById('hmiSpStandby').innerText = findTagVal('PourcentChauffeVeille') + " %";
+            document.getElementById('hmiCoeff').innerText = findTagVal('Coeff');
+            document.getElementById('hmiFreq').innerText = findTagVal('FrequenceRegul');
+            document.getElementById('hmiStartUp').innerText = findTagVal('PourcentChauffeDemar') + " %";
 
-                for(let o = 1; o <= 16; o++) {
-                    let ovenValStr = findTagVal(`RetourEtatLampeFour${o}`);
-                    let ovenBitmask = parseInt(ovenValStr, 10) || 0;
-                    
-                    let isLampOn = (ovenBitmask & (1 << (z - 1))) !== 0;
-                    let stateClass = isLampOn ? 'on' : 'off';
-                    
-                    gridHtml += `<div class="lamp ${stateClass}"></div>`;
-                }
-                gridHtml += `<div class="grid-row-pct">${zonePct}</div>`;
-            }
-            document.getElementById('hmiLampGrid').innerHTML = gridHtml;
+            document.getElementById('hmiPrefMin').innerText = findTagVal('TempCorpsMini');
+            document.getElementById('hmiPrefMax').innerText = findTagVal('TempCorpsMaxi');
 
-            // Render Extracted Data Panels
-            document.getElementById('hmiSpTemp').innerText = findTagVal('TempConsigne') + " °C";
-            document.getElementById('hmiSpVent').innerText = findTagVal('PourcentVentil') + " %";
-            document.getElementById('hmiSpStandby').innerText = findTagVal('PourcentChauffeVeille') + " %";
-            document.getElementById('hmiCoeff').innerText = findTagVal('Coeff');
-            document.getElementById('hmiFreq').innerText = findTagVal('FrequenceRegul');
-            document.getElementById('hmiStartUp').innerText = findTagVal('PourcentChauffeDemar') + " %";
-
-            document.getElementById('hmiPrefMin').innerText = findTagVal('TempCorpsMini');
-            document.getElementById('hmiPrefMax').innerText = findTagVal('TempCorpsMaxi');
-
-            document.getElementById('hmiTogBreak').innerHTML = getIcon(findTagVal('ArrMachineBrisLampe'));
-            document.getElementById('hmiTogZ12').innerHTML = getIcon(findTagVal('Zone1et2EnVeille'));
-            document.getElementById('hmiTogAcc').innerHTML = getIcon(findTagVal('PrechauffeAccelere'));
-            
-            document.getElementById('hmiSyncOp').innerText = findTagVal('OuvertureChargement');
-            document.getElementById('hmiSyncCl').innerText = findTagVal('FermetureChargement');
-        }
-    </script>
+            document.getElementById('hmiTogBreak').innerHTML = getIcon(findTagVal('ArrMachineBrisLampe'));
+            document.getElementById('hmiTogZ12').innerHTML = getIcon(findTagVal('Zone1et2EnVeille'));
+            document.getElementById('hmiTogAcc').innerHTML = getIcon(findTagVal('PrechauffeAccelere'));
+            
+            document.getElementById('hmiSyncOp').innerText = findTagVal('OuvertureChargement');
+            document.getElementById('hmiSyncCl').innerText = findTagVal('FermetureChargement');
+        }
+    </script>
 </body>
 </html>
