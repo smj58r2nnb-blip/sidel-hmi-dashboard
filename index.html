@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidel HMI Pro</title>
+    <title>Sidel HMI Pro - DBF Driven</title>
     <style>
         :root {
             --bg-main: #2b3e50;
@@ -18,15 +18,17 @@
 
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-main); color: var(--text-dark); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         header { background: var(--header-bg); color: white; padding: 10px 20px; font-size: 1.2rem; font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a3450; box-shadow: 0 2px 5px rgba(0,0,0,0.3); z-index: 10; }
-        .upload-area { background-color: #fff; padding: 10px 20px; border-bottom: 1px solid #9fb2c0; display: flex; gap: 15px; align-items: center; }
+        .upload-area { background-color: #fff; padding: 10px 20px; border-bottom: 1px solid #9fb2c0; display: flex; gap: 15px; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        input[type="file"] { border: 1px solid #ccc; padding: 5px; border-radius: 4px; }
+        
         .dashboard { display: flex; flex: 1; overflow: hidden; }
-        .sidebar { width: 220px; background-color: #fff; border-right: 1px solid #9fb2c0; overflow-y: auto; }
-        .nav-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.9rem; font-weight: bold; }
+        .sidebar { width: 220px; background-color: #fff; border-right: 1px solid #9fb2c0; overflow-y: auto; display: flex; flex-direction: column; }
+        .nav-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.9rem; font-weight: bold; color: #555; }
         .nav-item:hover { background-color: #f0f5fa; }
         .nav-item.active { background: var(--header-bg); color: white; }
         .main-content { flex: 1; padding: 20px; overflow-y: auto; position: relative; }
         
-        .view-toggle { position: absolute; top: 20px; right: 20px; background-color: var(--btn-blue); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; z-index: 10; }
+        .view-toggle { position: absolute; top: 20px; right: 20px; background-color: var(--btn-blue); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; box-shadow: 1px 1px 3px rgba(0,0,0,0.3); z-index: 10; }
         .view-toggle:hover { background-color: #4a77a8; }
         .empty-state { text-align: center; color: #a3c4e0; font-size: 1.5rem; margin-top: 100px; font-weight: bold; }
 
@@ -35,46 +37,47 @@
         th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
         th { background-color: #f5f5f5; }
 
-        /* HMI Layout */
+        /* SIDEL HMI VISUAL STYLES */
         .hmi-layout { display: flex; flex-direction: column; gap: 20px; margin-top: 30px; background-color: var(--panel-bg); padding: 20px; border-radius: 8px; box-shadow: inset 2px 2px 10px rgba(255,255,255,0.4), 0 5px 15px rgba(0,0,0,0.4); }
         .hmi-row { display: flex; gap: 20px; }
-        .hmi-panel { background: var(--panel-inner); border: 2px solid var(--border); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; flex: 1; }
-        .hmi-panel-header { font-weight: bold; color: #1a3450; text-transform: uppercase; border-bottom: 2px solid var(--border); margin-bottom: 10px; text-align: center; background: #ffffff; padding: 8px; }
-        .hmi-sub-header { text-align: center; font-size: 0.75rem; font-weight: bold; color: #3f688e; margin-top: -5px; margin-bottom: 5px; letter-spacing: 0.5px; }
+        .hmi-panel { background: var(--panel-inner); border: 2px solid var(--border); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; flex: 1; box-shadow: inset 1px 1px 3px white, 0 4px 6px rgba(0,0,0,0.15); }
+        .hmi-panel-header { background: #ffffff; text-align: center; font-size: 0.95rem; font-weight: bold; color: #1a3450; padding: 8px; border-bottom: 2px solid var(--border); text-transform: uppercase; }
+        .hmi-sub-header { text-align: center; font-size: 0.75rem; font-weight: bold; color: #3f688e; margin-top: 8px; margin-bottom: 5px; letter-spacing: 0.5px; }
 
-        /* Heating Bars */
+        /* Heating % Bars */
         .heating-panel { flex: 0.4; }
-        .bars-container { display: flex; flex-direction: column; gap: 8px; }
+        .bars-container { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
         .bar-row { display: flex; align-items: center; font-size: 0.85rem; }
         .bar-label { width: 20px; font-weight: bold; }
-        .bar-val { width: 45px; text-align: right; margin-right: 10px; font-family: monospace; font-size: 0.9rem; }
+        .bar-val { width: 45px; text-align: right; margin-right: 10px; font-family: monospace; font-size: 0.9rem;}
         .bar-track { flex: 1; height: 14px; background-color: #ffffff; border: 1px solid #777; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.2); }
         .bar-fill { height: 100%; background: linear-gradient(to bottom, #ffcca6, #ff9d00); border-right: 1px solid #c77b00; }
 
-        /* Lamp Matrix */
+        /* Lamp Grid */
         .lamp-panel { flex: 0.6; }
         .grid-container { display: grid; grid-template-columns: 30px repeat(16, 1fr) 45px; gap: 5px; padding: 10px 15px 15px 15px; align-items: center; position: relative; }
         
         .bg-penetration { background-color: #6a95c2; margin: -5px -2.5px; z-index: 0; border-radius: 4px 0 0 4px; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1); }
         .bg-distribution { background-color: #8eb5db; margin: -5px -2.5px; z-index: 0; border-radius: 0 4px 4px 0; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1); }
-        
-        .col-header { font-size: 0.8rem; font-weight: bold; color: #1a3450; text-align: center; z-index: 1; padding-bottom: 5px; }
+
+        .col-header { font-size: 0.8rem; text-align: center; font-weight: bold; color: #1a3450; padding-bottom: 5px; z-index: 1; }
         .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; z-index: 1; }
         .grid-row-pct { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; z-index: 1; }
         
         .lamp { height: 12px; border: 1px solid #555; border-radius: 2px; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2); z-index: 1; }
-        .lamp.yellow { background-color: #ffea00; box-shadow: 0 0 6px rgba(255, 234, 0, 0.6), inset 1px 1px 2px rgba(255,255,255,0.6); border-color: #cca400; }
-        .lamp.orange { background-color: #ff7700; box-shadow: 0 0 6px rgba(255, 119, 0, 0.6), inset 1px 1px 2px rgba(255,255,255,0.6); border-color: #c75500; }
+        
+        /* WATTAGE COLOR CODING */
+        .lamp.yellow { background-color: #ffea00; border-color: #cca400; box-shadow: 0 0 6px rgba(255, 234, 0, 0.6), inset 1px 1px 2px rgba(255,255,255,0.6); }
+        .lamp.orange { background-color: #ff7700; border-color: #c75500; box-shadow: 0 0 6px rgba(255, 119, 0, 0.6), inset 1px 1px 2px rgba(255,255,255,0.6); }
         .lamp.off { background-color: var(--lamp-off); }
 
         /* Data Boxes */
-        .data-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; font-weight: 600; margin-bottom: 10px; }
+        .data-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; font-weight: 600; margin-bottom: 10px;}
         .data-box { background-color: #ffffff; border: 1px solid #aebfd0; padding: 5px 15px; border-radius: 6px; font-family: monospace; font-size: 1.1rem; color: #1a3450; text-align: center; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1); min-width: 60px; }
         .check-icon { color: green; font-weight: bold; font-size: 1.2rem; }
         .cross-icon { color: red; font-weight: bold; font-size: 1.2rem; }
         hr { border: 0; border-top: 1px solid #b0c0d0; width: 100%; margin: 5px 0 10px 0; }
     </style>
-    <!-- Google Translate Script -->
     <script type="text/javascript">
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({pageLanguage: 'fr', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
@@ -121,7 +124,6 @@
                 </table>
             </div>
 
-            <!-- SIDEL HMI VISUALIZATION -->
             <div id="hmiView" style="display: none;">
                 <div class="hmi-layout">
                     
@@ -194,9 +196,6 @@
         let recipeData = {};
         let currentActiveSection = "";
         let isVisualMode = false;
-        
-        // Locked configuration for your specific machine
-        const penetrationSplit = 5;
 
         function loadFile() {
             const file = document.getElementById('fileInput').files[0];
@@ -219,6 +218,7 @@
             reader.readAsArrayBuffer(file);
         }
 
+        // FULL BINARY DBF ENGINE
         function processBinaryDBF(arrayBuffer) {
             const view = new DataView(arrayBuffer);
             const numRecords = view.getUint32(4, true);
@@ -259,6 +259,7 @@
             buildRecipeData(records);
         }
 
+        // FULL TEXT ENGINE FALLBACK
         function processTextFile(arrayBuffer) {
             const decoder = new TextDecoder('windows-1252');
             const lines = decoder.decode(arrayBuffer).split('\n');
@@ -274,6 +275,7 @@
             buildRecipeData(records);
         }
 
+        // BUILD DATA MAP
         function buildRecipeData(records) {
             recipeData = {};
             let currentSection = "GENERAL INFO";
@@ -331,15 +333,31 @@
             }
         }
 
-        function cleanStr(str) { return str.replace(/[^a-zA-Z0-9_\[\]]/g, '').toLowerCase(); }
-
+        // DBF LOOKUP ENGINE
         function findTagVal(tag) {
-            const cleanTarget = cleanStr(tag);
+            const cleanTarget = tag.replace(/[^a-zA-Z0-9_\[\]]/g, '').toLowerCase();
             for (const section in recipeData) {
-                const row = recipeData[section].find(r => cleanStr(r.tag) === cleanTarget);
+                const row = recipeData[section].find(r => r.tag.replace(/[^a-zA-Z0-9_\[\]]/g, '').toLowerCase() === cleanTarget);
                 if (row) return row.value.trim();
             }
-            return "0"; 
+            return ""; // Returns empty string if not found so we can accurately test existence
+        }
+
+        // AUTOMATICALLY FINDS THE OVEN SPLIT IN THE DBF FILE
+        function getDynamicPenetrationSplit() {
+            for (const section in recipeData) {
+                for (const row of recipeData[section]) {
+                    let t = row.tag.toLowerCase();
+                    // Searches the DBF for NbFourPenetration, FourPenetration, etc.
+                    if (t.includes('penet') || t.includes('péné') || t.includes('penét')) {
+                        let val = parseInt(row.value, 10);
+                        if (!isNaN(val) && val > 0 && val <= 16) {
+                            return val;
+                        }
+                    }
+                }
+            }
+            return 5; // Safe default based on your setup if completely missing from DBF
         }
 
         function getIcon(val) {
@@ -392,50 +410,78 @@
         }
 
         function renderVisualHMI() {
-            let generalHeating = parseFloat(findTagVal('PourcentChauffeDemar').replace(',', '.')) || 100;
+            // Read Heating Multiplier
+            let generalHeatingStr = findTagVal('PourcentChauffeDemar');
+            let generalHeating = parseFloat(generalHeatingStr.replace(',', '.')) || 100;
 
+            // Draw Heating Bars
             let barsHtml = '';
             for (let z = 9; z >= 1; z--) {
-                let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
+                let zonePctStr = findTagVal(`PourcentageZone${z}`);
+                let zonePct = parseFloat(zonePctStr.replace(',', '.')) || 0;
                 let overallPct = Math.round((zonePct * generalHeating) / 100);
                 barsHtml += `<div class="bar-row"><span class="bar-label">${z}</span><span class="bar-val">${overallPct}</span><div class="bar-track"><div class="bar-fill" style="width: ${overallPct}%;"></div></div></div>`;
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
 
+            // DYNAMIC DBF READ: Get the Oven Split
+            let splitCount = getDynamicPenetrationSplit();
             let gridHtml = '';
             
-            // Background explicit coordinates
-            gridHtml += `<div class="bg-penetration" style="grid-row: 1 / span 10; grid-column: 2 / span ${penetrationSplit};"></div>`;
-            gridHtml += `<div class="bg-distribution" style="grid-row: 1 / span 10; grid-column: ${2 + penetrationSplit} / span ${16 - penetrationSplit};"></div>`;
+            // Draw Blue Backgrounds dynamically based on the DBF split value
+            gridHtml += `<div class="bg-penetration" style="grid-row: 1 / span 10; grid-column: 2 / span ${splitCount};"></div>`;
+            if (splitCount < 16) {
+                gridHtml += `<div class="bg-distribution" style="grid-row: 1 / span 10; grid-column: ${2 + splitCount} / span ${16 - splitCount};"></div>`;
+            }
 
-            // Oven Headers
+            // Draw Column Headers
             gridHtml += `<div style="grid-row: 1; grid-column: 1;"></div>`; 
             for(let o = 1; o <= 16; o++) {
                 gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: ${o + 1};">${o}</div>`;
             }
             gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: 18;">%</div>`;
 
+            // Draw Lamps
             let rowIndex = 2;
             for (let z = 9; z >= 1; z--) {
                 gridHtml += `<div class="grid-row-label" style="grid-row: ${rowIndex}; grid-column: 1;">${z}</div>`;
                 let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
 
                 for(let o = 1; o <= 16; o++) {
+                    let isPenetration = (o <= splitCount);
+
+                    // 1. DYNAMIC DBF READ: Is the lamp ON in the recipe bitmask?
                     let ovenValStr = findTagVal(`RetourEtatLampeFour${o}`);
                     let ovenBitmask = parseInt(ovenValStr, 10) || 0;
                     let isLampOn = (ovenBitmask & (1 << (z - 1))) !== 0;
 
-                    // Safety check: ensure lamp exists mechanically in the recipe array
+                    // 2. DYNAMIC DBF READ: Hardware decoding for 3000W vs 2500W
                     let posValStr = findTagVal(`PositionLampe${z + 1}[${o - 1}]`);
-                    let posVal = parseFloat(posValStr.replace(',', '.')) || 0;
-                    if (posVal === 0) isLampOn = false;
-
-                    let color = 'off';
-                    if (isLampOn) {
-                        // All penetration lamps (1-5) are Yellow. All distribution lamps (6-16) are Orange.
-                        color = (o <= penetrationSplit) ? 'yellow' : 'orange';
-                    }
+                    let typeValStr = findTagVal(`TypeLampe${z + 1}[${o - 1}]`);
                     
+                    let posVal = parseFloat(posValStr.replace(',', '.')) || 0;
+                    let typeVal = parseFloat(typeValStr.replace(',', '.')) || 0;
+
+                    let wattageColorClass = 'orange'; // Default 2500W
+                    
+                    // If explicit wattage numbers exist in your DBF version
+                    if (posVal === 3000 || typeVal === 3000 || posVal === 2 || typeVal === 2) {
+                        wattageColorClass = 'yellow';
+                    } else if (posVal === 2500 || typeVal === 2500) {
+                        wattageColorClass = 'orange';
+                    } else if (posVal === 1 && typeVal === 0) {
+                        // Sidel Fallback: If '1' just means "Installed", apply Sidel's physical machine rules
+                        wattageColorClass = (isPenetration && z >= 4) ? 'yellow' : 'orange';
+                    } else {
+                        wattageColorClass = (isPenetration && z >= 4) ? 'yellow' : 'orange';
+                    }
+
+                    // Safety check: if PositionLampe explicitly exists and is 0, the lamp is mechanically empty
+                    if (posValStr !== "" && posVal === 0) {
+                        isLampOn = false;
+                    }
+
+                    let color = isLampOn ? wattageColorClass : 'off';
                     gridHtml += `<div class="lamp ${color}" style="grid-row: ${rowIndex}; grid-column: ${o + 1};"></div>`;
                 }
                 gridHtml += `<div class="grid-row-pct" style="grid-row: ${rowIndex}; grid-column: 18;">${zonePct}</div>`;
@@ -444,22 +490,22 @@
             document.getElementById('hmiLampGrid').innerHTML = gridHtml;
 
             // Render Extracted Data Panels
-            document.getElementById('hmiSpTemp').innerText = findTagVal('TempConsigne') + " °C";
-            document.getElementById('hmiSpVent').innerText = findTagVal('PourcentVentil') + " %";
-            document.getElementById('hmiSpStandby').innerText = findTagVal('PourcentChauffeVeille') + " %";
-            document.getElementById('hmiCoeff').innerText = findTagVal('Coeff');
-            document.getElementById('hmiFreq').innerText = findTagVal('FrequenceRegul');
-            document.getElementById('hmiStartUp').innerText = findTagVal('PourcentChauffeDemar') + " %";
+            document.getElementById('hmiSpTemp').innerText = (findTagVal('TempConsigne') || "--") + " °C";
+            document.getElementById('hmiSpVent').innerText = (findTagVal('PourcentVentil') || "--") + " %";
+            document.getElementById('hmiSpStandby').innerText = (findTagVal('PourcentChauffeVeille') || "--") + " %";
+            document.getElementById('hmiCoeff').innerText = findTagVal('Coeff') || "--";
+            document.getElementById('hmiFreq').innerText = findTagVal('FrequenceRegul') || "--";
+            document.getElementById('hmiStartUp').innerText = (findTagVal('PourcentChauffeDemar') || "--") + " %";
 
-            document.getElementById('hmiPrefMin').innerText = findTagVal('TempCorpsMini');
-            document.getElementById('hmiPrefMax').innerText = findTagVal('TempCorpsMaxi');
+            document.getElementById('hmiPrefMin').innerText = findTagVal('TempCorpsMini') || "--";
+            document.getElementById('hmiPrefMax').innerText = findTagVal('TempCorpsMaxi') || "--";
 
             document.getElementById('hmiTogBreak').innerHTML = getIcon(findTagVal('ArrMachineBrisLampe'));
             document.getElementById('hmiTogZ12').innerHTML = getIcon(findTagVal('Zone1et2EnVeille'));
             document.getElementById('hmiTogAcc').innerHTML = getIcon(findTagVal('PrechauffeAccelere'));
             
-            document.getElementById('hmiSyncOp').innerText = findTagVal('OuvertureChargement');
-            document.getElementById('hmiSyncCl').innerText = findTagVal('FermetureChargement');
+            document.getElementById('hmiSyncOp').innerText = (findTagVal('OuvertureChargement') || "--") + " %";
+            document.getElementById('hmiSyncCl').innerText = (findTagVal('FermetureChargement') || "--") + " %";
         }
     </script>
 </body>
