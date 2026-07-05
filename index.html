@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidel HMI - DBF Driven</title>
+    <title>Sidel HMI Pro - Master Configuration</title>
     <style>
         :root {
             --bg-main: #2b3e50;
@@ -64,7 +64,8 @@
         .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; z-index: 1; }
         .grid-row-pct { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; z-index: 1; }
         
-        .lamp { height: 12px; border: 1px solid #555; border-radius: 2px; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2); z-index: 1; }
+        .lamp { height: 12px; border: 1px solid #555; border-radius: 2px; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2); z-index: 1; cursor: pointer; transition: transform 0.1s; }
+        .lamp:hover { transform: scale(1.2); border-color: #1a3450; }
         
         /* WATTAGE COLOR CODING */
         .lamp.yellow { background-color: #ffea00; border-color: #cca400; box-shadow: 0 0 6px rgba(255, 234, 0, 0.6), inset 1px 1px 2px rgba(255,255,255,0.6); }
@@ -135,7 +136,10 @@
 
                         <div class="hmi-panel lamp-panel">
                             <div class="hmi-panel-header">LAMP SET-UP (OVENS)</div>
-                            <div class="hmi-sub-header">PENETRATION OVENS / DISTRIBUTION OVENS</div>
+                            <div class="hmi-sub-header">
+                                PENETRATION OVENS / DISTRIBUTION OVENS<br>
+                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Hardware Config: Click any lamp to toggle 3000W/2500W Socket)</span>
+                            </div>
                             <div class="grid-container" id="hmiLampGrid"></div>
                         </div>
                     </div>
@@ -193,6 +197,22 @@
     </div>
 
     <script>
+        // HARDWARE CONFIGURATION MEMORY
+        // Pre-loaded exactly to match the Sidel screen you photographed.
+        // Format: 'Zone-Oven'
+        let yellowSockets = JSON.parse(localStorage.getItem('sidelYellowSockets')) || ['8-3', '4-3', '4-5', '2-5', '1-2', '1-4'];
+
+        function toggleSocket(z, o) {
+            let socketId = `${z}-${o}`;
+            if (yellowSockets.includes(socketId)) {
+                yellowSockets = yellowSockets.filter(id => id !== socketId);
+            } else {
+                yellowSockets.push(socketId);
+            }
+            localStorage.setItem('sidelYellowSockets', JSON.stringify(yellowSockets));
+            renderVisualHMI();
+        }
+
         let recipeData = {};
         let currentActiveSection = "";
         let isVisualMode = false;
@@ -340,24 +360,20 @@
                 const row = recipeData[section].find(r => r.tag.replace(/[^a-zA-Z0-9_\[\]]/g, '').toLowerCase() === cleanTarget);
                 if (row) return row.value.trim();
             }
-            return ""; // Returns empty string if not found so we can accurately test existence
+            return ""; 
         }
 
         // AUTOMATICALLY FINDS THE OVEN SPLIT IN THE DBF FILE
         function getDynamicPenetrationSplit() {
             let nbreFours = parseInt(findTagVal('NbreFours'), 10) || 16;
-            
-            // Look for NbreDistr2 first, fallback to NbreDistr
             let nbreDistrStr = findTagVal('NbreDistr2');
             if (nbreDistrStr === "") nbreDistrStr = findTagVal('NbreDistr');
-            
             let nbreDistr = parseInt(nbreDistrStr, 10);
             
-            // E.g. If 16 total ovens and 11 distribution ovens, penetration split = 5
             if (!isNaN(nbreDistr) && nbreDistr > 0 && nbreDistr < nbreFours) {
                 return nbreFours - nbreDistr;
             }
-            return 5; // Safe default based on your setup if completely missing from DBF
+            return 5; 
         }
 
         function getIcon(val) {
@@ -410,11 +426,9 @@
         }
 
         function renderVisualHMI() {
-            // Read Heating Multiplier
             let generalHeatingStr = findTagVal('PourcentChauffeDemar');
             let generalHeating = parseFloat(generalHeatingStr.replace(',', '.')) || 100;
 
-            // Draw Heating Bars
             let barsHtml = '';
             for (let z = 9; z >= 1; z--) {
                 let zonePctStr = findTagVal(`PourcentageZone${z}`);
@@ -424,24 +438,20 @@
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
 
-            // DYNAMIC DBF READ: Get the Oven Split
             let splitCount = getDynamicPenetrationSplit();
             let gridHtml = '';
             
-            // Draw Blue Backgrounds dynamically based on the DBF split value
             gridHtml += `<div class="bg-penetration" style="grid-row: 1 / span 10; grid-column: 2 / span ${splitCount};"></div>`;
             if (splitCount < 16) {
                 gridHtml += `<div class="bg-distribution" style="grid-row: 1 / span 10; grid-column: ${2 + splitCount} / span ${16 - splitCount};"></div>`;
             }
 
-            // Draw Column Headers
             gridHtml += `<div style="grid-row: 1; grid-column: 1;"></div>`; 
             for(let o = 1; o <= 16; o++) {
                 gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: ${o + 1};">${o}</div>`;
             }
             gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: 18;">%</div>`;
 
-            // Draw Lamps
             let rowIndex = 2;
             for (let z = 9; z >= 1; z--) {
                 gridHtml += `<div class="grid-row-label" style="grid-row: ${rowIndex}; grid-column: 1;">${z}</div>`;
@@ -450,44 +460,30 @@
                 for(let o = 1; o <= 16; o++) {
                     let isPenetration = (o <= splitCount);
 
-                    // 1. DYNAMIC DBF READ: Is the lamp ON in the recipe bitmask?
                     let ovenValStr = findTagVal(`RetourEtatLampeFour${o}`);
                     let ovenBitmask = parseInt(ovenValStr, 10) || 0;
                     let isLampOn = (ovenBitmask & (1 << (z - 1))) !== 0;
 
-                    // 2. DYNAMIC DBF READ: Hardware decoding for 3000W vs 2500W
                     let posValStr = findTagVal(`PositionLampe${z + 1}[${o - 1}]`);
-                    let typeValStr = findTagVal(`TypeLampe${z + 1}[${o - 1}]`);
-                    
                     let posVal = parseFloat(posValStr.replace(',', '.')) || 0;
-                    let typeVal = parseFloat(typeValStr.replace(',', '.')) || 0;
-
-                    let wattageColorClass = 'orange'; // Default 2500W
-                    
-                    // If explicit wattage numbers exist in your DBF version
-                    if (posVal === 3000 || typeVal === 3000 || posVal === 2 || typeVal === 2) {
-                        wattageColorClass = 'yellow';
-                    } else if (posVal === 2500 || typeVal === 2500) {
-                        wattageColorClass = 'orange';
-                    } else {
-                        // Sidel Fallback: If '1' just means "Installed", apply Sidel's physical machine rules
-                        wattageColorClass = (isPenetration && z >= 4) ? 'yellow' : 'orange';
-                    }
-
-                    // Safety check: if PositionLampe explicitly exists and is 0, the lamp is mechanically empty
                     if (posValStr !== "" && posVal === 0) {
-                        isLampOn = false;
+                        isLampOn = false; // Lamp is physically missing
                     }
 
+                    // READ HARDWARE MEMORY
+                    let socketId = `${z}-${o}`;
+                    let isYellowSocket = yellowSockets.includes(socketId);
+                    
+                    let wattageColorClass = (isPenetration && isYellowSocket) ? 'yellow' : 'orange';
                     let color = isLampOn ? wattageColorClass : 'off';
-                    gridHtml += `<div class="lamp ${color}" style="grid-row: ${rowIndex}; grid-column: ${o + 1};"></div>`;
+                    
+                    gridHtml += `<div class="lamp ${color}" style="grid-row: ${rowIndex}; grid-column: ${o + 1};" onclick="toggleSocket(${z}, ${o})" title="Socket ${socketId} - Click to swap 3000W/2500W"></div>`;
                 }
                 gridHtml += `<div class="grid-row-pct" style="grid-row: ${rowIndex}; grid-column: 18;">${zonePct}</div>`;
                 rowIndex++;
             }
             document.getElementById('hmiLampGrid').innerHTML = gridHtml;
 
-            // Render Extracted Data Panels
             document.getElementById('hmiSpTemp').innerText = (findTagVal('TempConsigne') || "--") + " °C";
             document.getElementById('hmiSpVent').innerText = (findTagVal('PourcentVentil') || "--") + " %";
             document.getElementById('hmiSpStandby').innerText = (findTagVal('PourcentChauffeVeille') || "--") + " %";
