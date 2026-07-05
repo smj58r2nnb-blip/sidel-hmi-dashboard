@@ -62,7 +62,7 @@
         
         .matrix-table td.pen { background-color: #5d8ab9; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.1); }
         .matrix-table td.dist { background-color: #8eb5db; box-shadow: inset -1px -1px 2px rgba(255,255,255,0.4); }
-        .matrix-table td.split { border-right: 3px solid #1a3450; } /* SOLID SPLIT LINE */
+        .matrix-table td.split { border-right: 3px solid #1a3450; } /* THE DYNAMIC SPLIT LINE */
         
         .matrix-table td.label-col { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; background: transparent; }
         .matrix-table td.pct-col { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; background: transparent; }
@@ -141,7 +141,7 @@
                             <div class="hmi-panel-header">LAMP SET-UP (OVENS)</div>
                             <div class="hmi-sub-header">
                                 PENETRATION OVENS / DISTRIBUTION OVENS<br>
-                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Hardware Config: Click Header to set Split. Click Lamp to toggle 3000W/2500W)</span>
+                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Click Header to set Split. Click Lamp to toggle 3000W/2500W boundary)</span>
                             </div>
                             <div id="hmiLampGrid"></div>
                         </div>
@@ -200,24 +200,33 @@
     </div>
 
     <script>
-        // HARDWARE CONFIGURATION MEMORY
-        let yellowSockets = JSON.parse(localStorage.getItem('sidelYellowSockets')) || ['8-3', '4-3', '4-5', '2-5', '1-2', '1-4'];
-        let globalPenetrationSplit = parseInt(localStorage.getItem('sidelPenetrationSplit'), 10) || 5;
+        // DYNAMIC ROW-BY-ROW SPLIT CONFIGURATION
+        // This stores where the split line is for every single row.
+        let defaultSplits = {1:4, 2:4, 3:5, 4:5, 5:5, 6:5, 7:5, 8:5, 9:5};
+        let rowSplits = JSON.parse(localStorage.getItem('sidelRowSplits')) || defaultSplits;
 
         function toggleSocket(z, o) {
-            let socketId = `${z}-${o}`;
-            if (yellowSockets.includes(socketId)) {
-                yellowSockets = yellowSockets.filter(id => id !== socketId);
-            } else {
-                yellowSockets.push(socketId);
+            let currentSplit = rowSplits[z];
+            
+            // If they click inside the Penetration Zone, pull the split line back to exclude it (making it Orange)
+            if (o <= currentSplit) {
+                rowSplits[z] = o - 1;
+            } 
+            // If they click inside the Distribution Zone, push the split line forward to include it (making it Yellow)
+            else {
+                rowSplits[z] = o;
             }
-            localStorage.setItem('sidelYellowSockets', JSON.stringify(yellowSockets));
+            
+            localStorage.setItem('sidelRowSplits', JSON.stringify(rowSplits));
             renderVisualHMI();
         }
 
+        // Force a straight split line down the entire grid
         function setGlobalSplit(o) {
-            globalPenetrationSplit = o;
-            localStorage.setItem('sidelPenetrationSplit', o);
+            for (let z = 1; z <= 9; z++) {
+                rowSplits[z] = o;
+            }
+            localStorage.setItem('sidelRowSplits', JSON.stringify(rowSplits));
             renderVisualHMI();
         }
 
@@ -410,7 +419,7 @@
                 document.getElementById('rawView').style.display = 'block';
                 document.getElementById('hmiView').style.display = 'none';
                 
-                const tbody = document.querySelector('#dataTable tbody');
+                const tbody = document.querySelector('.raw-table tbody');
                 tbody.innerHTML = '';
                 recipeData[section].forEach(row => {
                     const tr = document.createElement('tr');
@@ -433,27 +442,29 @@
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
 
-            // BULLETPROOF HTML TABLE GENERATOR
-            let splitCount = globalPenetrationSplit;
+            // GENERATE HTML TABLE MATRIX
             let gridHtml = '<table class="matrix-table"><thead><tr><th></th>';
-            
-            // Generate Table Headers
             for(let o = 1; o <= 16; o++) {
-                gridHtml += `<th onclick="setGlobalSplit(${o})" title="Click to set Split at Oven ${o}">${o}</th>`;
+                gridHtml += `<th onclick="setGlobalSplit(${o})" title="Click to set Split at Oven ${o} for all rows">${o}</th>`;
             }
             gridHtml += '<th>%</th></tr></thead><tbody>';
 
-            // Generate Table Rows
             for (let z = 9; z >= 1; z--) {
                 gridHtml += `<tr><td class="label-col">${z}</td>`;
                 let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
+                let splitForThisRow = rowSplits[z];
 
                 for(let o = 1; o <= 16; o++) {
-                    let isPenetration = (o <= splitCount);
+                    let isPenetration = (o <= splitForThisRow);
                     
-                    // Assign strict table cell background colors and split borders
                     let bgClass = isPenetration ? 'pen' : 'dist';
-                    let splitClass = (o === splitCount) ? 'split' : '';
+                    let splitClass = (o === splitForThisRow) ? 'split' : '';
+
+                    let radiusStyle = '';
+                    if (z === 9 && o === 1) radiusStyle += 'border-top-left-radius: 6px; ';
+                    if (z === 9 && o === 16) radiusStyle += 'border-top-right-radius: 6px; ';
+                    if (z === 1 && o === 1) radiusStyle += 'border-bottom-left-radius: 6px; ';
+                    if (z === 1 && o === 16) radiusStyle += 'border-bottom-right-radius: 6px; ';
 
                     let ovenValStr = findTagVal(`RetourEtatLampeFour${o}`);
                     let ovenBitmask = parseInt(ovenValStr, 10) || 0;
@@ -462,18 +473,16 @@
                     let posValStr = findTagVal(`PositionLampe${z + 1}[${o - 1}]`);
                     let posVal = parseFloat(posValStr.replace(',', '.')) || 0;
                     if (posValStr !== "" && posVal === 0) {
-                        isLampOn = false; // Lamp is physically missing
+                        isLampOn = false;
                     }
 
-                    let socketId = `${z}-${o}`;
-                    let isYellowSocket = yellowSockets.includes(socketId);
-                    
-                    let wattageColorClass = (isPenetration && isYellowSocket) ? 'yellow' : 'orange';
+                    let wattageColorClass = isPenetration ? 'yellow' : 'orange';
                     let color = isLampOn ? wattageColorClass : 'off';
+                    let wattageText = isPenetration ? '3000W (Yellow)' : '2500W (Orange)';
                     
-                    let lampHtml = `<div class="lamp ${color}" onclick="toggleSocket(${z}, ${o})" title="Socket ${socketId} - Click to swap 3000W/2500W"></div>`;
+                    let lampHtml = `<div class="lamp ${color}" onclick="toggleSocket(${z}, ${o})" title="Zone ${z}, Oven ${o} - Click to configure as ${isPenetration ? '2500W (Orange)' : '3000W (Yellow)'}"></div>`;
                     
-                    gridHtml += `<td class="${bgClass} ${splitClass}">${lampHtml}</td>`;
+                    gridHtml += `<td class="${bgClass} ${splitClass}" style="${radiusStyle}">${lampHtml}</td>`;
                 }
                 gridHtml += `<td class="pct-col">${zonePct}</td></tr>`;
             }
