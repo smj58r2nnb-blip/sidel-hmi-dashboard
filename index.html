@@ -57,8 +57,22 @@
         .lamp-panel { flex: 0.6; }
         .grid-container { display: grid; grid-template-columns: 30px repeat(16, 1fr) 45px; gap: 5px; padding: 10px 15px 15px 15px; align-items: center; position: relative; }
         
-        .bg-penetration { background-color: #6a95c2; margin: -5px -2.5px; z-index: 0; border-radius: 4px 0 0 4px; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1); }
-        .bg-distribution { background-color: #8eb5db; margin: -5px -2.5px; z-index: 0; border-radius: 0 4px 4px 0; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1); }
+        /* SPLIT LINE & BACKGROUNDS */
+        .bg-penetration { 
+            background-color: #6a95c2; 
+            margin: -5px 0 -5px -2.5px; 
+            z-index: 0; 
+            border-radius: 4px 0 0 4px; 
+            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1); 
+            border-right: 2px solid #1a3450; /* THE VISUAL SPLIT LINE */
+        }
+        .bg-distribution { 
+            background-color: #8eb5db; 
+            margin: -5px -2.5px -5px 0; 
+            z-index: 0; 
+            border-radius: 0 4px 4px 0; 
+            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1); 
+        }
 
         .col-header { font-size: 0.8rem; text-align: center; font-weight: bold; color: #1a3450; padding-bottom: 5px; z-index: 1; }
         .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; z-index: 1; }
@@ -198,8 +212,6 @@
 
     <script>
         // HARDWARE CONFIGURATION MEMORY
-        // Pre-loaded exactly to match the Sidel screen you photographed.
-        // Format: 'Zone-Oven'
         let yellowSockets = JSON.parse(localStorage.getItem('sidelYellowSockets')) || ['8-3', '4-3', '4-5', '2-5', '1-2', '1-4'];
 
         function toggleSocket(z, o) {
@@ -373,7 +385,7 @@
             if (!isNaN(nbreDistr) && nbreDistr > 0 && nbreDistr < nbreFours) {
                 return nbreFours - nbreDistr;
             }
-            return 5; 
+            return 5; // Default fallback
         }
 
         function getIcon(val) {
@@ -441,11 +453,13 @@
             let splitCount = getDynamicPenetrationSplit();
             let gridHtml = '';
             
+            // DYNAMIC BACKGROUNDS WITH SPLIT LINE
             gridHtml += `<div class="bg-penetration" style="grid-row: 1 / span 10; grid-column: 2 / span ${splitCount};"></div>`;
             if (splitCount < 16) {
                 gridHtml += `<div class="bg-distribution" style="grid-row: 1 / span 10; grid-column: ${2 + splitCount} / span ${16 - splitCount};"></div>`;
             }
 
+            // Headers
             gridHtml += `<div style="grid-row: 1; grid-column: 1;"></div>`; 
             for(let o = 1; o <= 16; o++) {
                 gridHtml += `<div class="col-header" style="grid-row: 1; grid-column: ${o + 1};">${o}</div>`;
@@ -470,7 +484,6 @@
                         isLampOn = false; // Lamp is physically missing
                     }
 
-                    // READ HARDWARE MEMORY
                     let socketId = `${z}-${o}`;
                     let isYellowSocket = yellowSockets.includes(socketId);
                     
