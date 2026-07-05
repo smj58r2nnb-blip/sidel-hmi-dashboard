@@ -58,11 +58,11 @@
         .grid-container { display: grid; grid-template-columns: 30px repeat(16, 1fr) 45px; gap: 5px; padding: 10px 15px 15px 15px; align-items: center; position: relative; }
         
         /* Foreground Elements (Forced above background) */
-        .col-header { font-size: 0.8rem; text-align: center; font-weight: bold; color: #1a3450; padding-bottom: 5px; position: relative; z-index: 5; }
-        .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; position: relative; z-index: 5; }
-        .grid-row-pct { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; position: relative; z-index: 5; }
+        .col-header { font-size: 0.8rem; text-align: center; font-weight: bold; color: #1a3450; padding-bottom: 5px; position: relative; z-index: 2; }
+        .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; position: relative; z-index: 2; }
+        .grid-row-pct { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; position: relative; z-index: 2; }
         
-        .lamp { height: 12px; border: 1px solid #555; border-radius: 2px; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.3); position: relative; z-index: 5; cursor: pointer; transition: transform 0.1s; }
+        .lamp { height: 12px; border: 1px solid #555; border-radius: 2px; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.3); position: relative; z-index: 3; cursor: pointer; transition: transform 0.1s; }
         .lamp:hover { transform: scale(1.3); border-color: #1a3450; }
         
         /* WATTAGE COLOR CODING */
@@ -437,17 +437,22 @@
             let splitCount = getDynamicPenetrationSplit();
             let gridHtml = '';
             
-            // BULLETPROOF BACKGROUND COLUMNS 
-            // We draw each column individually from top to bottom so the Chromebook browser cannot ignore it.
-            for (let o = 1; o <= 16; o++) {
-                let isPenetration = (o <= splitCount);
-                let bgColor = isPenetration ? '#5d8ab9' : '#8eb5db';
-                
-                // Add the thick split line on the right edge of the last penetration oven
-                let borderRight = (o === splitCount) ? '3px solid #1a3450' : 'none';
-                let borderRadius = (o === 1) ? '6px 0 0 6px' : (o === 16) ? '0 6px 6px 0' : '0';
+            // BULLETPROOF CELL-BY-CELL BACKGROUND RENDERING
+            // We paint every cell individually to force Webkit/ChromeOS to render it correctly
+            for (let r = 1; r <= 10; r++) { 
+                for (let c = 1; c <= 16; c++) {
+                    let isPen = c <= splitCount;
+                    let bgColor = isPen ? '#6a95c2' : '#8eb5db';
+                    let borderRight = (c === splitCount) ? 'border-right: 3px solid #1a3450;' : '';
+                    
+                    let radius = '';
+                    if (r === 1 && c === 1) radius = 'border-top-left-radius: 6px;';
+                    else if (r === 1 && c === 16) radius = 'border-top-right-radius: 6px;';
+                    else if (r === 10 && c === 1) radius = 'border-bottom-left-radius: 6px;';
+                    else if (r === 10 && c === 16) radius = 'border-bottom-right-radius: 6px;';
 
-                gridHtml += `<div style="grid-row-start: 1; grid-row-end: 11; grid-column: ${o + 1}; background-color: ${bgColor}; border-right: ${borderRight}; border-radius: ${borderRadius}; margin: -5px -2.5px; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1); z-index: 0;"></div>`;
+                    gridHtml += `<div style="grid-row: ${r}; grid-column: ${c + 1}; background-color: ${bgColor}; ${borderRight} ${radius} margin: -3px; z-index: 1;"></div>`;
+                }
             }
 
             // Headers
