@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidel HMI Master Configuration</title>
+    <title>Sidel HMI Pro - Master Configuration</title>
     <style>
         :root {
             --bg-main: #2b3e50;
@@ -57,7 +57,24 @@
         .lamp-panel { flex: 0.6; }
         .grid-container { display: grid; grid-template-columns: 30px repeat(16, 1fr) 45px; gap: 5px; padding: 10px 15px 15px 15px; align-items: center; position: relative; }
         
-        /* Foreground Elements (Forced above background) */
+        /* BULLETPROOF SPLIT BACKGROUNDS */
+        .bg-penetration { 
+            background-color: #5d8ab9; 
+            margin: -5px 0 -5px -2.5px; 
+            z-index: 1; 
+            border-radius: 6px 0 0 6px; 
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.15); 
+            border-right: 3px solid #1a3450; 
+        }
+        .bg-distribution { 
+            background-color: #8eb5db; 
+            margin: -5px -2.5px -5px 0; 
+            z-index: 1; 
+            border-radius: 0 6px 6px 0; 
+            box-shadow: inset -2px 2px 5px rgba(0,0,0,0.1); 
+        }
+
+        /* Foreground Elements */
         .col-header { font-size: 0.8rem; text-align: center; font-weight: bold; color: #1a3450; padding-bottom: 5px; position: relative; z-index: 2; }
         .grid-row-label { font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; position: relative; z-index: 2; }
         .grid-row-pct { font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; position: relative; z-index: 2; }
@@ -437,22 +454,10 @@
             let splitCount = getDynamicPenetrationSplit();
             let gridHtml = '';
             
-            // BULLETPROOF CELL-BY-CELL BACKGROUND RENDERING
-            // We paint every cell individually to force Webkit/ChromeOS to render it correctly
-            for (let r = 1; r <= 10; r++) { 
-                for (let c = 1; c <= 16; c++) {
-                    let isPen = c <= splitCount;
-                    let bgColor = isPen ? '#6a95c2' : '#8eb5db';
-                    let borderRight = (c === splitCount) ? 'border-right: 3px solid #1a3450;' : '';
-                    
-                    let radius = '';
-                    if (r === 1 && c === 1) radius = 'border-top-left-radius: 6px;';
-                    else if (r === 1 && c === 16) radius = 'border-top-right-radius: 6px;';
-                    else if (r === 10 && c === 1) radius = 'border-bottom-left-radius: 6px;';
-                    else if (r === 10 && c === 16) radius = 'border-bottom-right-radius: 6px;';
-
-                    gridHtml += `<div style="grid-row: ${r}; grid-column: ${c + 1}; background-color: ${bgColor}; ${borderRight} ${radius} margin: -3px; z-index: 1;"></div>`;
-                }
+            // BULLETPROOF BACKGROUNDS: Adding align-self and justify-self to force Chromebooks to stretch the empty div.
+            gridHtml += `<div class="bg-penetration" style="grid-row: 1 / span 10; grid-column: 2 / span ${splitCount}; align-self: stretch; justify-self: stretch; min-height: 100%; width: 100%;"></div>`;
+            if (splitCount < 16) {
+                gridHtml += `<div class="bg-distribution" style="grid-row: 1 / span 10; grid-column: ${2 + splitCount} / span ${16 - splitCount}; align-self: stretch; justify-self: stretch; min-height: 100%; width: 100%;"></div>`;
             }
 
             // Headers
