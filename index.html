@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidel HMI Pro - Hardware Accurate Viewer</title>
+    <title>Sidel HMI Pro - Automatic Viewer</title>
     <style>
         :root {
             --bg-main: #2b3e50;
@@ -22,9 +22,6 @@
         .upload-area { background-color: #fff; padding: 10px 20px; border-bottom: 1px solid #9fb2c0; display: flex; gap: 15px; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         input[type="file"] { border: 1px solid #ccc; padding: 5px; border-radius: 4px; font-size: 0.9rem; }
         
-        .reset-btn { background-color: #ff9d00; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
-        .reset-btn:hover { background-color: #e68d00; }
-
         .dashboard { display: flex; flex: 1; overflow: hidden; }
         .sidebar { width: 220px; background-color: #fff; border-right: 1px solid #9fb2c0; overflow-y: auto; display: flex; flex-direction: column; }
         .nav-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.9rem; font-weight: bold; color: #555; }
@@ -61,8 +58,7 @@
         .lamp-panel { flex: 0.6; }
         .matrix-table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
         .matrix-table th, .matrix-table td { padding: 4px; text-align: center; border: none; }
-        .matrix-table th { color: #1a3450; font-size: 0.8rem; font-weight: bold; border-bottom: 2px solid var(--border); padding-bottom: 8px; cursor: pointer; }
-        .matrix-table th:hover { color: #ff9d00; }
+        .matrix-table th { color: #1a3450; font-size: 0.8rem; font-weight: bold; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
         
         .matrix-table td.pen { background-color: #5d8ab9; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.1); }
         .matrix-table td.dist { background-color: #8eb5db; box-shadow: inset -1px -1px 2px rgba(255,255,255,0.4); }
@@ -71,8 +67,7 @@
         .matrix-table th.label-col, .matrix-table td.label-col { width: 25px; font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; background: transparent; }
         .matrix-table th.pct-col, .matrix-table td.pct-col { width: 35px; font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; background: transparent; }
 
-        .lamp { height: 12px; border: 1px solid #555; border-radius: 2px; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.4); cursor: pointer; transition: transform 0.1s; width: 100%; }
-        .lamp:hover { transform: scale(1.3); border-color: #1a3450; }
+        .lamp { height: 12px; border: 1px solid #555; border-radius: 2px; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.4); width: 100%; }
         
         /* WATTAGE COLOR CODING */
         .lamp.yellow { background-color: #ffea00; border-color: #cca400; box-shadow: 0 0 6px rgba(255, 234, 0, 0.6), inset 1px 1px 2px rgba(255,255,255,0.6); }
@@ -86,12 +81,6 @@
         .cross-icon { color: red; font-weight: bold; font-size: 1.2rem; }
         hr { border: 0; border-top: 1px solid #b0c0d0; width: 100%; margin: 5px 0 10px 0; }
     </style>
-    <script type="text/javascript">
-        function googleTranslateElementInit() {
-            new google.translate.TranslateElement({pageLanguage: 'fr', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
-        }
-    </script>
-    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </head>
 <body>
 
@@ -100,13 +89,11 @@
             <div>SIDEL HMI PRO</div>
             <div id="recipeName" style="font-size: 0.9rem; font-weight: normal; color: #a3c4e0;">No file loaded</div>
         </div>
-        <div id="google_translate_element"></div>
     </header>
 
     <div class="upload-area">
         <input type="file" id="fileInput" accept=".dbf,.txt,*/*" onchange="loadFile()" />
-        <button class="reset-btn" onclick="resetHardwareMap()" title="Restores the exact hardware layout from the physical machine">Reset Hardware Split</button>
-        <span style="font-size: 0.85rem; color: #666; margin-left: 10px;">(Viewer overlays Recipe ON/OFF states onto Hardware Map)</span>
+        <span style="font-size: 0.85rem; color: #666; margin-left: 10px;">(Auto-detects DBF Recipe Split. Left = Yellow, Right = Orange)</span>
     </div>
 
     <div class="dashboard">
@@ -146,7 +133,7 @@
                             <div class="hmi-panel-header">LAMP SET-UP (OVENS)</div>
                             <div class="hmi-sub-header">
                                 PENETRATION OVENS / DISTRIBUTION OVENS<br>
-                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Hardware Config: Click any cell to move the split line for that row)</span>
+                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Viewer strictly mirrors DBF data structure)</span>
                             </div>
                             <div id="hmiLampGrid"></div>
                         </div>
@@ -205,40 +192,6 @@
     </div>
 
     <script>
-        // IMMUNE HARDWARE CONFIGURATION MEMORY
-        // These defaults perfectly match your IMG_1127.jpg physical machine mechanical layout
-        const FACTORY_SPLITS = {9:5, 8:5, 7:5, 6:5, 5:5, 4:5, 3:5, 2:3, 1:3};
-
-        let rowSplits;
-        try {
-            rowSplits = JSON.parse(localStorage.getItem('sidelRowSplits'));
-            if (!rowSplits || typeof rowSplits !== 'object' || !('9' in rowSplits)) throw "Invalid Map";
-        } catch(e) {
-            rowSplits = Object.assign({}, FACTORY_SPLITS);
-        }
-
-        function resetHardwareMap() {
-            localStorage.removeItem('sidelRowSplits');
-            rowSplits = Object.assign({}, FACTORY_SPLITS);
-            renderVisualHMI();
-        }
-
-        // Sets the hardware split boundary for a specific row
-        function setRowSplit(z, o) {
-            rowSplits[z] = o;
-            localStorage.setItem('sidelRowSplits', JSON.stringify(rowSplits));
-            renderVisualHMI();
-        }
-
-        // Sets a straight hardware split boundary for ALL rows
-        function setGlobalSplit(o) {
-            for (let z = 1; z <= 9; z++) {
-                rowSplits[z] = o;
-            }
-            localStorage.setItem('sidelRowSplits', JSON.stringify(rowSplits));
-            renderVisualHMI();
-        }
-
         let recipeData = {};
         let currentActiveSection = "";
         let isVisualMode = false;
@@ -402,6 +355,22 @@
             return ""; 
         }
 
+        // AUTOMATIC RECIPE-BASED SPLIT DETECTION (Total Ovens - Distribution Ovens)
+        function getDynamicPenetrationSplit() {
+            let nbreFours = parseInt(findTagVal('NbreFours'), 10) || 16;
+            
+            // Look for NbreDistr2, fallback to NbreDistr
+            let nbreDistrStr = findTagVal('NbreDistr2');
+            if (nbreDistrStr === "") nbreDistrStr = findTagVal('NbreDistr');
+            
+            let nbreDistr = parseInt(nbreDistrStr, 10);
+            
+            if (!isNaN(nbreDistr) && nbreDistr >= 0 && nbreDistr < nbreFours) {
+                return nbreFours - nbreDistr;
+            }
+            return 5; // Default safety fallback
+        }
+
         function checkLampStatus(z, o) { 
             // TRIPLE-SCAN BITMASK: Guarantees lamps will render regardless of how the file was saved
             let valEtat = parseInt(findTagVal(`EtatLampeFour${o}`), 10) || 0;
@@ -462,23 +431,83 @@
         }
 
         function renderVisualHMI() {
-            let generalHeatingStr = findTagVal('PourcentChauffeDemar');
-            let generalHeating = parseFloat(generalHeatingStr.replace(',', '.')) || 100;
-
             let barsHtml = '';
+            
             for (let z = 9; z >= 1; z--) {
                 let zonePctStr = findTagVal(`PourcentageZone${z}`);
                 if (zonePctStr === "") zonePctStr = findTagVal(`PourcentZone${z}`);
                 let zonePct = parseFloat(zonePctStr.replace(',', '.')) || 0;
-                let overallPct = Math.round((zonePct * generalHeating) / 100);
-                barsHtml += `<div class="bar-row"><span class="bar-label">${z}</span><span class="bar-val">${overallPct}</span><div class="bar-track"><div class="bar-fill" style="width: ${overallPct}%;"></div></div></div>`;
+
+                // --- DEEP SCANNER FOR OVERALL HEATING % ---
+                // We stop guessing the math and actually extract the saved PID output from the DBF file.
+                let overallPct = 0;
+                let foundExactTag = false;
+                
+                // 1. Try Sidel's known output tags
+                let possibleTags = [
+                    `CmdChauffeZone${z}`, 
+                    `SortieRegulZone${z}`,
+                    `SortieChauffeZone${z}`, 
+                    `PuissanceZone${z}`, 
+                    `ChauffeReelleZone${z}`,
+                    `PourcentChauffeZone${z}`,
+                    `TauxChauffeZone${z}`,
+                    `MesureChauffeZone${z}`,
+                    `ValeurChauffeZone${z}`
+                ];
+                
+                for (let tag of possibleTags) {
+                    let valStr = findTagVal(tag);
+                    if (valStr !== "") {
+                        overallPct = parseFloat(valStr.replace(',', '.'));
+                        foundExactTag = true;
+                        break;
+                    }
+                }
+                
+                // 2. Fuzzy Search: If known tags fail, search the DBF for ANY float tag for this zone
+                if (!foundExactTag) {
+                    for (const section in recipeData) {
+                        for (const row of recipeData[section]) {
+                            let upperTag = row.tag.toUpperCase();
+                            // Exclude the setpoint variable
+                            if (upperTag === `POURCENTAGEZONE${z}` || upperTag === `POURCENTZONE${z}`) continue;
+                            
+                            if (upperTag.includes(`ZONE${z}`) && (upperTag.includes('CMD') || upperTag.includes('CHAUF') || upperTag.includes('PUIS') || upperTag.includes('OUT') || upperTag.includes('SORTIE'))) {
+                                let parsed = parseFloat(row.value.replace(',', '.'));
+                                if (!isNaN(parsed) && row.value.includes('.')) { 
+                                    overallPct = parsed;
+                                    foundExactTag = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if(foundExactTag) break;
+                    }
+                }
+                
+                // 3. Absolute Fallback (if no PID data was saved in the DBF)
+                if (!foundExactTag) {
+                    let generalHeatingStr = findTagVal('PourcentChauffeDemar') || "100";
+                    let generalHeating = parseFloat(generalHeatingStr.replace(',', '.')) || 100;
+                    overallPct = (zonePct * generalHeating) / 100;
+                }
+
+                // Format exactly like the Sidel screen (1 decimal place)
+                let displayVal = overallPct.toFixed(1);
+                let barWidth = overallPct > 100 ? 100 : overallPct;
+
+                barsHtml += `<div class="bar-row"><span class="bar-label">${z}</span><span class="bar-val">${displayVal}</span><div class="bar-track"><div class="bar-fill" style="width: ${barWidth}%;"></div></div></div>`;
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
+
+            // Automatically read the split location straight from the DBF
+            let splitCount = getDynamicPenetrationSplit();
 
             // GENERATE HTML TABLE MATRIX
             let gridHtml = '<table class="matrix-table"><thead><tr><th class="label-col"></th>';
             for(let o = 1; o <= 16; o++) {
-                gridHtml += `<th onclick="setGlobalSplit(${o})" title="Click to force straight Split Line at Oven ${o} for all rows">${o}</th>`;
+                gridHtml += `<th>${o}</th>`;
             }
             gridHtml += '<th class="pct-col">%</th></tr></thead><tbody>';
 
@@ -488,15 +517,12 @@
                 let zonePctStr = findTagVal(`PourcentageZone${z}`);
                 if (zonePctStr === "") zonePctStr = findTagVal(`PourcentZone${z}`);
                 let zonePct = parseFloat(zonePctStr.replace(',', '.')) || 0;
-                
-                // Fetch the split line for this specific row from the hardware map
-                let splitForThisRow = rowSplits[z];
 
                 for(let o = 1; o <= 16; o++) {
-                    let isPenetration = (o <= splitForThisRow);
+                    let isPenetration = (o <= splitCount);
                     
                     let bgClass = isPenetration ? 'pen' : 'dist';
-                    let splitClass = (o === splitForThisRow) ? 'split-right' : '';
+                    let splitClass = (o === splitCount) ? 'split-right' : '';
 
                     let radiusStyle = '';
                     if (z === 9 && o === 1) radiusStyle += 'border-top-left-radius: 6px; ';
@@ -505,12 +531,18 @@
                     if (z === 1 && o === 16) radiusStyle += 'border-bottom-right-radius: 6px; ';
 
                     let isLampOn = checkLampStatus(z, o);
+
+                    let posValStr = findTagVal(`PositionLampe${z + 1}[${o - 1}]`);
+                    let posVal = parseFloat(posValStr.replace(',', '.')) || 0;
+                    if (posValStr !== "" && posVal === 0) {
+                        isLampOn = false; 
+                    }
                     
                     // Simple Rule: If it's on the left side of the split, it's Yellow. Otherwise, Orange.
                     let wattageColorClass = isPenetration ? 'yellow' : 'orange';
                     let color = isLampOn ? wattageColorClass : 'off';
                     
-                    let lampHtml = `<div class="lamp ${color}" onclick="setRowSplit(${z}, ${o})" title="Zone ${z}, Oven ${o} - Click here to set Split Line"></div>`;
+                    let lampHtml = `<div class="lamp ${color}" title="Zone ${z}, Oven ${o}"></div>`;
                     
                     gridHtml += `<td class="${bgClass} ${splitClass}" style="${radiusStyle}">${lampHtml}</td>`;
                 }
