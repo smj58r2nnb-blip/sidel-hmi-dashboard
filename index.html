@@ -61,8 +61,7 @@
         .lamp-panel { flex: 0.6; }
         .matrix-table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
         .matrix-table th, .matrix-table td { padding: 4px; text-align: center; border: none; }
-        .matrix-table th { color: #1a3450; font-size: 0.8rem; font-weight: bold; cursor: pointer; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
-        .matrix-table th:hover { color: #ff9d00; }
+        .matrix-table th { color: #1a3450; font-size: 0.8rem; font-weight: bold; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
         
         .matrix-table td.pen { background-color: #5d8ab9; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.1); }
         .matrix-table td.dist { background-color: #8eb5db; box-shadow: inset -1px -1px 2px rgba(255,255,255,0.4); }
@@ -105,7 +104,7 @@
 
     <div class="upload-area">
         <input type="file" id="fileInput" accept=".dbf,.txt,*/*" onchange="loadFile()" />
-        <button class="reset-btn" onclick="resetHardwareMap()" title="Restores the exact hardware layout from the physical machine">Reset Machine Layout</button>
+        <button class="reset-btn" onclick="resetHardwareMap()" title="Restores the exact hardware layout from the physical machine">Reset Hardware Mapping</button>
         <span style="font-size: 0.85rem; color: #666;">(Processed locally)</span>
     </div>
 
@@ -146,7 +145,7 @@
                             <div class="hmi-panel-header">LAMP SET-UP (OVENS)</div>
                             <div class="hmi-sub-header">
                                 PENETRATION OVENS / DISTRIBUTION OVENS<br>
-                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Click Header to set global split. Click Lamp to toggle 3000W/2500W boundary)</span>
+                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Split is automatic based on DBF file. Click Lamp to toggle 3000W/2500W hardware mapping)</span>
                             </div>
                             <div id="hmiLampGrid"></div>
                         </div>
@@ -205,17 +204,8 @@
     </div>
 
     <script>
-        // IMMUNE HARDWARE CONFIGURATION MEMORY
-        const FACTORY_SPLITS = {9:5, 8:5, 7:5, 6:5, 5:5, 4:5, 3:3, 2:3, 1:4};
-        const FACTORY_YELLOWS = ['8-3', '4-3', '4-5', '1-2', '1-4'];
-
-        let rowSplits;
-        try {
-            rowSplits = JSON.parse(localStorage.getItem('sidelRowSplits'));
-            if (!rowSplits || typeof rowSplits !== 'object' || !('9' in rowSplits)) throw "Invalid Map";
-        } catch(e) {
-            rowSplits = Object.assign({}, FACTORY_SPLITS);
-        }
+        // HARDWARE CONFIGURATION MEMORY (Only remembers 3000W vs 2500W locations)
+        const FACTORY_YELLOWS = ['8-3', '4-3', '4-5', '1-2', '1-4', '1-5'];
 
         let yellowSockets;
         try {
@@ -226,39 +216,19 @@
         }
 
         function resetHardwareMap() {
-            localStorage.removeItem('sidelRowSplits');
             localStorage.removeItem('sidelYellowSockets');
-            rowSplits = Object.assign({}, FACTORY_SPLITS);
             yellowSockets = [...FACTORY_YELLOWS];
             renderVisualHMI();
         }
 
         function toggleSocket(z, o) {
             let socketId = `${z}-${o}`;
-            
-            // DYNAMIC SPLIT LOGIC
-            if (o > rowSplits[z]) {
-                rowSplits[z] = o; 
-            } else if (o === rowSplits[z]) {
-                rowSplits[z] = o - 1;
-            }
-
             if (yellowSockets.includes(socketId)) {
                 yellowSockets = yellowSockets.filter(id => id !== socketId);
             } else {
                 yellowSockets.push(socketId);
             }
-            
-            localStorage.setItem('sidelRowSplits', JSON.stringify(rowSplits));
             localStorage.setItem('sidelYellowSockets', JSON.stringify(yellowSockets));
-            renderVisualHMI();
-        }
-
-        function setGlobalSplit(o) {
-            for (let z = 1; z <= 9; z++) {
-                rowSplits[z] = o;
-            }
-            localStorage.setItem('sidelRowSplits', JSON.stringify(rowSplits));
             renderVisualHMI();
         }
 
@@ -425,6 +395,27 @@
             return ""; 
         }
 
+        // AUTOMATIC RECIPE-BASED SPLIT DETECTION
+        function getDynamicPenetrationSplit() {
+            let nbreFours = parseInt(findTagVal('NbreFours'), 10) || 16;
+            
+            // Prefer NbreDistr2, fallback to NbreDistr
+            let nbreDistrStr = findTagVal('NbreDistr2');
+            if (nbreDistrStr === "") nbreDistrStr = findTagVal('NbreDistr');
+            
+            let nbreDistr = parseInt(nbreDistrStr, 10);
+            
+            if (!isNaN(nbreDistr) && nbreDistr >= 0 && nbreDistr < nbreFours) {
+                return nbreFours - nbreDistr; // e.g., 16 - 11 = 5
+            }
+            return 5; // Default safety fallback
+        }
+
+        function checkLamp(z, o) { 
+            let mask = parseInt(findTagVal('RetourEtatLampeFour'+o), 10) || 0;
+            return (mask & (1 << (z - 1))) !== 0;
+        }
+
         function getIcon(val) {
             return (parseFloat(val.replace(',', '.')) > 0) ? '<span class="check-icon">✔</span>' : '<span class="cross-icon">✘</span>';
         }
@@ -488,10 +479,13 @@
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
 
+            // Automatically read the split location from the DBF file
+            let splitCount = getDynamicPenetrationSplit();
+
             // GENERATE HTML TABLE MATRIX
             let gridHtml = '<table class="matrix-table"><thead><tr><th class="label-col"></th>';
             for(let o = 1; o <= 16; o++) {
-                gridHtml += `<th onclick="setGlobalSplit(${o})" title="Click to force straight Split Line at Oven ${o} for all rows">${o}</th>`;
+                gridHtml += `<th>${o}</th>`;
             }
             gridHtml += '<th class="pct-col">%</th></tr></thead><tbody>';
 
@@ -501,14 +495,13 @@
                 let zonePctStr = findTagVal(`PourcentageZone${z}`);
                 if (zonePctStr === "") zonePctStr = findTagVal(`PourcentZone${z}`);
                 let zonePct = parseFloat(zonePctStr.replace(',', '.')) || 0;
-                
-                let splitForThisRow = rowSplits[z];
 
                 for(let o = 1; o <= 16; o++) {
-                    let isPenetration = (o <= splitForThisRow);
+                    // Straight split logic based entirely on the DBF file's variable
+                    let isPenetration = (o <= splitCount);
                     
                     let bgClass = isPenetration ? 'pen' : 'dist';
-                    let splitClass = (o === splitForThisRow) ? 'split-right' : '';
+                    let splitClass = (o === splitCount) ? 'split-right' : '';
 
                     let radiusStyle = '';
                     if (z === 9 && o === 1) radiusStyle += 'border-top-left-radius: 6px; ';
@@ -530,13 +523,14 @@
                         isLampOn = false; 
                     }
 
+                    // Look up hardware configuration independently of the background
                     let socketId = `${z}-${o}`;
                     let isYellowSocket = yellowSockets.includes(socketId);
                     
-                    let wattageColorClass = isPenetration ? (isYellowSocket ? 'yellow' : 'orange') : 'orange';
+                    let wattageColorClass = isYellowSocket ? 'yellow' : 'orange';
                     let color = isLampOn ? wattageColorClass : 'off';
                     
-                    let lampHtml = `<div class="lamp ${color}" onclick="toggleSocket(${z}, ${o})" title="Zone ${z}, Oven ${o} - Click to configure wattage and split line"></div>`;
+                    let lampHtml = `<div class="lamp ${color}" onclick="toggleSocket(${z}, ${o})" title="Zone ${z}, Oven ${o} - Click to toggle 3000W/2500W hardware mapping"></div>`;
                     
                     gridHtml += `<td class="${bgClass} ${splitClass}" style="${radiusStyle}">${lampHtml}</td>`;
                 }
