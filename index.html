@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidel HMI Pro - Viewer</title>
+    <title>Sidel HMI Pro - Automatic Viewer</title>
     <style>
         :root {
             --bg-main: #2b3e50;
@@ -13,17 +13,15 @@
             --text-dark: #1a3450;
             --border: #2a6f9e;
             --lamp-off: #ffffff;
-            --lamp-on: #e67e22; /* Sidel Orange */
-            --pen-bg: #6a95c2; /* Sidel Dark Blue */
-            --dist-bg: #b5d3e7; /* Sidel Light Blue */
-            --split-line: #7b1fa2; /* Sidel Purple */
+            --btn-blue: #5d92c8;
+            --split-line: #1a3450;
         }
 
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-main); color: var(--text-dark); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         header { background: var(--header-bg); color: white; padding: 10px 20px; font-size: 1.2rem; font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a3450; box-shadow: 0 2px 5px rgba(0,0,0,0.3); z-index: 10; }
         .upload-area { background-color: #fff; padding: 10px 20px; border-bottom: 1px solid #9fb2c0; display: flex; gap: 15px; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        input[type="file"] { border: 1px solid #ccc; padding: 5px; border-radius: 4px; }
-
+        input[type="file"] { border: 1px solid #ccc; padding: 5px; border-radius: 4px; font-size: 0.9rem; }
+        
         .dashboard { display: flex; flex: 1; overflow: hidden; }
         .sidebar { width: 220px; background-color: #fff; border-right: 1px solid #9fb2c0; overflow-y: auto; display: flex; flex-direction: column; }
         .nav-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.9rem; font-weight: bold; color: #555; }
@@ -62,15 +60,18 @@
         .matrix-table th, .matrix-table td { padding: 4px; text-align: center; border: none; }
         .matrix-table th { color: #1a3450; font-size: 0.8rem; font-weight: bold; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
         
-        .matrix-table td.pen { background-color: var(--pen-bg); box-shadow: inset 1px 1px 2px rgba(0,0,0,0.1); }
-        .matrix-table td.dist { background-color: var(--dist-bg); box-shadow: inset -1px -1px 2px rgba(255,255,255,0.4); }
-        .matrix-table td.split-right { border-right: 2px solid var(--split-line) !important; }
+        .matrix-table td.pen { background-color: #5d8ab9; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.1); }
+        .matrix-table td.dist { background-color: #8eb5db; box-shadow: inset -1px -1px 2px rgba(255,255,255,0.4); }
+        .matrix-table td.split-right { border-right: 3px solid var(--split-line); }
         
         .matrix-table th.label-col, .matrix-table td.label-col { width: 25px; font-weight: bold; font-size: 0.9rem; text-align: right; padding-right: 10px; background: transparent; }
         .matrix-table th.pct-col, .matrix-table td.pct-col { width: 35px; font-weight: bold; font-size: 0.9rem; text-align: right; color: var(--text-dark); padding-left: 5px; font-family: monospace; background: transparent; }
 
         .lamp { height: 12px; border: 1px solid #555; border-radius: 2px; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.4); width: 100%; }
-        .lamp.orange { background-color: var(--lamp-on); border-color: #c75500; box-shadow: 0 0 4px rgba(230, 126, 34, 0.6), inset 1px 1px 2px rgba(255,255,255,0.4); }
+        
+        /* WATTAGE COLOR CODING */
+        .lamp.yellow { background-color: #ffea00; border-color: #cca400; box-shadow: 0 0 6px rgba(255, 234, 0, 0.6), inset 1px 1px 2px rgba(255,255,255,0.6); }
+        .lamp.orange { background-color: #ff7700; border-color: #c75500; box-shadow: 0 0 6px rgba(255, 119, 0, 0.6), inset 1px 1px 2px rgba(255,255,255,0.6); }
         .lamp.off { background-color: var(--lamp-off); }
 
         /* Data Boxes */
@@ -80,13 +81,6 @@
         .cross-icon { color: red; font-weight: bold; font-size: 1.2rem; }
         hr { border: 0; border-top: 1px solid #b0c0d0; width: 100%; margin: 5px 0 10px 0; }
     </style>
-    <!-- Google Translate Script -->
-    <script type="text/javascript">
-        function googleTranslateElementInit() {
-            new google.translate.TranslateElement({pageLanguage: 'fr', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
-        }
-    </script>
-    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </head>
 <body>
 
@@ -95,12 +89,11 @@
             <div>SIDEL HMI PRO</div>
             <div id="recipeName" style="font-size: 0.9rem; font-weight: normal; color: #a3c4e0;">No file loaded</div>
         </div>
-        <div id="google_translate_element"></div>
     </header>
 
     <div class="upload-area">
         <input type="file" id="fileInput" accept=".dbf,.txt,*/*" onchange="loadFile()" />
-        <span style="font-size: 0.85rem; color: #666;">(Processed locally. Layout renders automatically based on DBF.)</span>
+        <span style="font-size: 0.85rem; color: #666; margin-left: 10px;">(Auto-detects DBF Recipe Split. Left = Yellow, Right = Orange)</span>
     </div>
 
     <div class="dashboard">
@@ -127,7 +120,6 @@
                 </table>
             </div>
 
-            <!-- SIDEL HMI VISUALIZATION -->
             <div id="hmiView" style="display: none;">
                 <div class="hmi-layout">
                     
@@ -141,7 +133,7 @@
                             <div class="hmi-panel-header">LAMP SET-UP (OVENS)</div>
                             <div class="hmi-sub-header">
                                 PENETRATION OVENS / DISTRIBUTION OVENS<br>
-                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Viewer Mode: Read-Only)</span>
+                                <span style="font-weight: normal; font-size: 0.7rem; color: #1a3450;">(Viewer Mode: Read-Only. Rendered automatically from DBF.)</span>
                             </div>
                             <div id="hmiLampGrid"></div>
                         </div>
@@ -363,23 +355,23 @@
             return ""; 
         }
 
-        // AUTOMATIC RECIPE-BASED SPLIT DETECTION (NbreFours - NbreDistr)
+        // AUTOMATIC RECIPE-BASED SPLIT DETECTION (Total Ovens - Distribution Ovens)
         function getDynamicPenetrationSplit() {
             let nbreFours = parseInt(findTagVal('NbreFours'), 10) || 16;
             
-            // Prefer NbreDistr2, fallback to NbreDistr
+            // Look for NbreDistr2, fallback to NbreDistr
             let nbreDistrStr = findTagVal('NbreDistr2');
             if (nbreDistrStr === "") nbreDistrStr = findTagVal('NbreDistr');
             
             let nbreDistr = parseInt(nbreDistrStr, 10);
             
             if (!isNaN(nbreDistr) && nbreDistr >= 0 && nbreDistr < nbreFours) {
-                return nbreFours - nbreDistr; 
+                return nbreFours - nbreDistr;
             }
             return 5; // Default safety fallback
         }
 
-        function checkLamp(z, o) { 
+        function checkLampStatus(z, o) { 
             // TRIPLE-SCAN BITMASK: Guarantees lamps will render regardless of how the file was saved
             let valEtat = parseInt(findTagVal(`EtatLampeFour${o}`), 10) || 0;
             let valRetour = parseInt(findTagVal(`RetourEtatLampeFour${o}`), 10) || 0;
@@ -445,14 +437,14 @@
             let barsHtml = '';
             for (let z = 9; z >= 1; z--) {
                 let zonePctStr = findTagVal(`PourcentageZone${z}`);
-                if (zonePctStr === "") zonePctStr = findTagVal(`PourcentZone${z}`); // Fallback
+                if (zonePctStr === "") zonePctStr = findTagVal(`PourcentZone${z}`);
                 let zonePct = parseFloat(zonePctStr.replace(',', '.')) || 0;
                 let overallPct = Math.round((zonePct * generalHeating) / 100);
                 barsHtml += `<div class="bar-row"><span class="bar-label">${z}</span><span class="bar-val">${overallPct}</span><div class="bar-track"><div class="bar-fill" style="width: ${overallPct}%;"></div></div></div>`;
             }
             document.getElementById('hmiBars').innerHTML = barsHtml;
 
-            // PURE DYNAMIC RECIPE SPLIT - No manual memory used here!
+            // Automatically read the split location straight from the DBF
             let splitCount = getDynamicPenetrationSplit();
 
             // GENERATE HTML TABLE MATRIX
@@ -481,7 +473,7 @@
                     if (z === 1 && o === 1) radiusStyle += 'border-bottom-left-radius: 6px; ';
                     if (z === 1 && o === 16) radiusStyle += 'border-bottom-right-radius: 6px; ';
 
-                    let isLampOn = checkLamp(z, o);
+                    let isLampOn = checkLampStatus(z, o);
 
                     // Mechanical configuration check - if lamp is physically removed, do not render it
                     let posValStr = findTagVal(`PositionLampe${z + 1}[${o - 1}]`);
@@ -490,7 +482,9 @@
                         isLampOn = false; 
                     }
                     
-                    let color = isLampOn ? 'orange' : 'off';
+                    // NEW RULE: If it's on the left side of the split, it's Yellow. Otherwise, Orange.
+                    let wattageColorClass = isPenetration ? 'yellow' : 'orange';
+                    let color = isLampOn ? wattageColorClass : 'off';
                     
                     let lampHtml = `<div class="lamp ${color}" title="Zone ${z}, Oven ${o}"></div>`;
                     
