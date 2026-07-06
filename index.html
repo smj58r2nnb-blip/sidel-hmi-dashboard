@@ -411,11 +411,6 @@
             return 5; // Default safety fallback
         }
 
-        function checkLamp(z, o) { 
-            let mask = parseInt(findTagVal('RetourEtatLampeFour'+o), 10) || 0;
-            return (mask & (1 << (z - 1))) !== 0;
-        }
-
         function getIcon(val) {
             return (parseFloat(val.replace(',', '.')) > 0) ? '<span class="check-icon">✔</span>' : '<span class="cross-icon">✘</span>';
         }
