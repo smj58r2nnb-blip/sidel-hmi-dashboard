@@ -206,7 +206,6 @@
 
     <script>
         // IMMUNE HARDWARE CONFIGURATION MEMORY
-        // These defaults perfectly match the machine's exact physical loadout from the photos
         const FACTORY_SPLITS = {9:5, 8:5, 7:5, 6:5, 5:5, 4:5, 3:3, 2:3, 1:4};
         const FACTORY_YELLOWS = ['8-3', '4-3', '4-5', '1-2', '1-4'];
 
@@ -239,9 +238,9 @@
             
             // DYNAMIC SPLIT LOGIC
             if (o > rowSplits[z]) {
-                rowSplits[z] = o; // Push split out to include this lamp as yellow
+                rowSplits[z] = o; 
             } else if (o === rowSplits[z]) {
-                rowSplits[z] = o - 1; // Pull split back to exclude this lamp (making it orange)
+                rowSplits[z] = o - 1;
             }
 
             if (yellowSockets.includes(socketId)) {
@@ -286,7 +285,6 @@
                     processTextFile(buffer);
                 }
                 
-                // Clear the input so you can instantly upload the same file again without refreshing
                 fileInput.value = ""; 
             };
             reader.readAsArrayBuffer(file);
@@ -402,7 +400,6 @@
                 };
                 sidebar.appendChild(navItem);
                 
-                // We actively seek out the "FOUR" section so we can auto-jump directly to the visual dashboard
                 if (section === "FOUR") {
                     targetSection = section;
                     targetElement = navItem;
@@ -426,11 +423,6 @@
                 if (row) return row.value.trim();
             }
             return ""; 
-        }
-
-        function checkLamp(z, o) { 
-            let mask = parseInt(findTagVal('RetourEtatLampeFour'+o), 10) || 0;
-            return (mask & (1 << (z - 1))) !== 0;
         }
 
         function getIcon(val) {
@@ -489,6 +481,7 @@
             let barsHtml = '';
             for (let z = 9; z >= 1; z--) {
                 let zonePctStr = findTagVal(`PourcentageZone${z}`);
+                if (zonePctStr === "") zonePctStr = findTagVal(`PourcentZone${z}`); // Fallback
                 let zonePct = parseFloat(zonePctStr.replace(',', '.')) || 0;
                 let overallPct = Math.round((zonePct * generalHeating) / 100);
                 barsHtml += `<div class="bar-row"><span class="bar-label">${z}</span><span class="bar-val">${overallPct}</span><div class="bar-track"><div class="bar-fill" style="width: ${overallPct}%;"></div></div></div>`;
@@ -504,15 +497,16 @@
 
             for (let z = 9; z >= 1; z--) {
                 gridHtml += `<tr><td class="label-col">${z}</td>`;
-                let zonePct = parseFloat(findTagVal(`PourcentageZone${z}`).replace(',', '.')) || 0;
                 
-                // Read the dynamic split boundary specifically for this row
+                let zonePctStr = findTagVal(`PourcentageZone${z}`);
+                if (zonePctStr === "") zonePctStr = findTagVal(`PourcentZone${z}`);
+                let zonePct = parseFloat(zonePctStr.replace(',', '.')) || 0;
+                
                 let splitForThisRow = rowSplits[z];
 
                 for(let o = 1; o <= 16; o++) {
                     let isPenetration = (o <= splitForThisRow);
                     
-                    // Assign strict table cell background colors and split borders
                     let bgClass = isPenetration ? 'pen' : 'dist';
                     let splitClass = (o === splitForThisRow) ? 'split-right' : '';
 
@@ -522,9 +516,14 @@
                     if (z === 1 && o === 1) radiusStyle += 'border-bottom-left-radius: 6px; ';
                     if (z === 1 && o === 16) radiusStyle += 'border-bottom-right-radius: 6px; ';
 
-                    let isLampOn = checkLamp(z, o);
+                    // TRIPLE-SCAN BITMASK: Guarantees lamps will render regardless of how the file was saved
+                    let valEtat = parseInt(findTagVal(`EtatLampeFour${o}`), 10) || 0;
+                    let valRetour = parseInt(findTagVal(`RetourEtatLampeFour${o}`), 10) || 0;
+                    let valConsigne = parseInt(findTagVal(`ConsigneEtatLampeFour${o}`), 10) || 0;
+                    
+                    let ovenBitmask = Math.max(valEtat, valRetour, valConsigne);
+                    let isLampOn = (ovenBitmask & (1 << (z - 1))) !== 0;
 
-                    // Verify if physically installed
                     let posValStr = findTagVal(`PositionLampe${z + 1}[${o - 1}]`);
                     let posVal = parseFloat(posValStr.replace(',', '.')) || 0;
                     if (posValStr !== "" && posVal === 0) {
